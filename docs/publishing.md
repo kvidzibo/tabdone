@@ -10,6 +10,8 @@ existing visibility. Ordinary pushes and pull requests never publish.
    pay the registration fee, and enable two-step verification on your Google account.
 2. Upload the first ZIP manually (`npm ci && npm run zip`). Complete the listing,
    screenshots, privacy disclosures/policy URL, distribution, and reviewer instructions.
+   Use the [prepared listing and reviewer text](store-listing.md) and
+   [privacy policy](privacy.md); confirm the policy URL is public before submitting.
    The API cannot create a listing. Publish this initial version through the dashboard.
 3. In a Google Cloud project, enable **Chrome Web Store API** and
    **IAM Service Account Credentials API**. Create a dedicated service account.
