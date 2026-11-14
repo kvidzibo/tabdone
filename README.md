@@ -22,7 +22,8 @@ and publisher tests also require the `zip` and `unzip` command-line tools.
 The [CI workflow](https://github.com/kvidzibo/tabdone/actions/workflows/ci.yml)
 also provides a downloadable build artifact after successful runs.
 A Chrome Web Store listing is not configured yet. Once configured, release tags
-can submit updates automatically; see [Publishing](docs/publishing.md).
+can submit updates automatically; see [Publishing](docs/publishing.md) and the
+[store submission materials](docs/store-listing.md).
 Unpacked installations still require manual updates.
 
 ## Create a rule
@@ -71,9 +72,11 @@ and **Ⅱ** when paused. Counts include protected tabs. The popup has a global p
 
 ## Privacy and permissions
 
-Everything stays in local extension storage; nothing is transmitted.
-Rules contain URL patterns, selectors, and selected text. Session-only state
-contains tab URLs and unfinished editor drafts. Do not select sensitive text.
+Data is processed on-device; the extension sends none of it to the developer or
+third parties. Rules contain URL patterns, selectors, and selected text. Session-only
+state contains full tab URLs and unfinished editor drafts. URLs and selected text
+can contain sensitive information; choose completion indicators carefully.
+See the [privacy policy](docs/privacy.md) for data use, retention and controls.
 
 - **tabs**: inspect URLs, count/group tabs, and close eligible tabs.
 - **scripting**: install the picker and completion observer.
@@ -84,7 +87,8 @@ contains tab URLs and unfinished editor drafts. Do not select sensitive text.
 
 Remove site access via Chrome's extension details. Disabling/deleting a rule stops
 watching it but does not revoke a previously granted site permission.
-No cookies, form values, API tokens, remote code, analytics, or external assets.
+The extension does not access browser cookies, password storage or form-field
+values. It has no remote code, analytics or external assets.
 
 ## Development
 
