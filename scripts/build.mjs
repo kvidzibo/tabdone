@@ -1,0 +1,11 @@
+import { build } from 'esbuild';
+import { cp, mkdir, rm, readFile } from 'node:fs/promises';
+const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+const manifest = JSON.parse(await readFile('public/manifest.json', 'utf8'));
+if (pkg.version !== manifest.version) throw new Error('Package and manifest versions must match');
+await rm('dist', { recursive: true, force: true });
+await mkdir('dist');
+await cp('public', 'dist', { recursive: true });
+await build({ entryPoints: ['src/background.ts','src/ui.ts'], outdir: 'dist', bundle: true, format: 'esm', target: 'chrome120' });
+await build({ entryPoints: ['src/content.ts'], outdir: 'dist', bundle: true, format: 'iife', target: 'chrome120' });
+console.log('Load unpacked: dist/');

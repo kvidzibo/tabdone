@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get update && sudo apt-get install -y xvfb dbus-x11 xdotool imagemagick
+      - name: Browser workflow
+        run: |
+          export CHROMIUM_PATH="$(node --input-type=module -e "import { chromium } from 'playwright'; console.log(chromium.executablePath())")"
+          npm run test:e2e
+      - run: npm run zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tabdone-0.1.0
+          path: tabdone-0.1.0.zip
