@@ -45,7 +45,7 @@ function start(): void {
       ? (element.getRootNode() as ShadowRoot).host : null);
   }
 
-  function isVisible(element: Element): boolean {
+  function isVisible(element: Element, requireBox = true): boolean {
     if (!element.isConnected || element.ownerDocument !== document) return false;
     for (let current: Element | null = element; current; current = parent(current)) {
       const style = getComputedStyle(current);
@@ -54,7 +54,7 @@ function start(): void {
           style.contentVisibility === "hidden" || Number(style.opacity) === 0) return false;
     }
     // Deliberately not an intersection/viewport test: off-screen content can be visible.
-    return Array.from(element.getClientRects()).some(rect => rect.width > 0 && rect.height > 0);
+    return !requireBox || Array.from(element.getClientRects()).some(rect => rect.width > 0 && rect.height > 0);
   }
 
   function isEditable(element: Element): boolean {
@@ -64,16 +64,20 @@ function start(): void {
 
   function elementText(element: Element): string {
     // Never read form values, including default textarea contents or editable text.
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-      acceptNode(node) {
-        if (node instanceof Element && (isEditable(node) || node.matches("script, style, template") || !isVisible(node)))
-          return NodeFilter.FILTER_REJECT;
-        return node.nodeType === Node.TEXT_NODE ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
-      },
-    });
-    let text = "";
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) text += node.textContent ?? "";
-    return normalizedText(text);
+    function textOf(node: Node): string {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+      if (!(node instanceof Element) || isEditable(node) || node.matches("script, style, template")) return "";
+      if (node.localName === "br") {
+        return isVisible(node, false) ? " " : "";
+      }
+      const display = getComputedStyle(node).display;
+      // display:contents has no own box but can contain visible text.
+      if (!isVisible(node, display !== "contents")) return "";
+      const text = Array.from(node.childNodes, textOf).join("");
+      const boundary = display !== "contents" && display !== "inline" && !display.startsWith("inline-");
+      return boundary ? ` ${text} ` : text;
+    }
+    return normalizedText(textOf(element));
   }
 
   function matchCount(rule: Rule): number {

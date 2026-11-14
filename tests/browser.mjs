@@ -10,8 +10,9 @@ const profile = await mkdtemp(join(tmpdir(), 'tabdone-browser-'));
 const shots = process.env.TABDONE_SCREENSHOTS || '/tmp/tabdone-screenshots';
 await mkdir(shots, { recursive: true });
 const server = createServer((_req, res) => {
+  if (_req.url === '/slow.png') { setTimeout(() => res.end(), 1500); return; }
   res.setHeader('Content-Type', 'text/html');
-  res.end(`<!doctype html><html><head><title>Example pull request</title><style>body{font:16px system-ui;background:#0d1117;color:#e6edf3;padding:50px}#status{display:inline-block;background:#8957e5;border-radius:20px;padding:8px 18px}textarea{display:block;margin-top:30px;width:400px;height:100px}button{padding:12px}</style></head><body><h1>Example / Pull request #118</h1><span id="status" onclick="window.pageClicks=(window.pageClicks||0)+1">Open</span><p>A representative completion indicator. No account or live site is used.</p><textarea aria-label="Comment" placeholder="Leave a comment"></textarea><button id="action" onclick="window.pageClicks=(window.pageClicks||0)+1">Page action</button></body></html>`);
+  res.end(`<!doctype html><html><head><title>Example pull request</title><style>body{font:16px system-ui;background:#0d1117;color:#e6edf3;padding:50px}#status{display:inline-block;background:#8957e5;border-radius:20px;padding:8px 18px}textarea{display:block;margin-top:30px;width:400px;height:100px}button{padding:12px}</style></head><body><h1>Example / Pull request #118</h1><span id="status" onclick="window.pageClicks=(window.pageClicks||0)+1">${_req.url.includes('initial') ? 'Merged' : 'Open'}</span>${_req.url.includes('initial') ? '<img src="/slow.png" alt="">' : ''}<p>A representative completion indicator. No account or live site is used.</p><textarea aria-label="Comment" placeholder="Leave a comment"></textarea><button id="action" onclick="window.pageClicks=(window.pageClicks||0)+1">Page action</button></body></html>`);
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}`;
@@ -140,6 +141,20 @@ try {
   await until(() => multi.isClosed(), 'second-window tab closes when its selection changes');
   await worker.evaluate(id => chrome.tabs.remove(id), second.id);
   console.log('Active tabs in unfocused windows remain protected');
+  const initial = await open('/owner/repo/pull/initial');
+  const initialId = await tabId(initial);
+  await until(async () => (await state()).observations[initialId], 'initial completion with delayed page load');
+  await activate(other); await until(() => initial.isClosed(), 'initially complete page closes after leaving');
+
+  // Rendered line breaks are whitespace, never concatenated words.
+  const textPage = await open('/owner/repo/pull/text');
+  await textPage.evaluate(() => { const s=document.querySelector('#status'); s.replaceChildren(document.createTextNode('Merged'), document.createElement('br'), document.createTextNode('now')); });
+  const textId = await tabId(textPage);
+  const rule = await worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings.rules[0]);
+  const inspectText = text => worker.evaluate(async ({ id, rule, text }) => chrome.tabs.sendMessage(id, { type:'inspect', rule:{ ...rule, text } }), { id:textId, rule, text });
+  await until(async () => (await inspectText('Merged now')).matches, 'visible line-break matching');
+  assert.equal((await inspectText('Mergednow')).matches, false);
+  console.log('Initial completion and rendered text boundary regressions passed');
   console.log(`Screenshots: ${shots}`);
 } finally {
   await context?.close(); await new Promise(r => server.close(r)); await rm(profile, { recursive: true, force: true });

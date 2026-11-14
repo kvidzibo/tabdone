@@ -173,6 +173,9 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
     if (config.rules.length > 100 || new Set(config.rules.map(r => r.id)).size !== config.rules.length) throw new Error('Use at most 100 rules with unique IDs.');
     for (const rule of config.rules) if (config.enabled && rule.enabled && !await allowed(rule)) throw new Error('Grant site access before enabling this rule.');
     await chrome.storage.local.set({ settings: config });
+    for (const id of Object.keys(state.picking)) {
+      try { await chrome.tabs.sendMessage(Number(id), { type: 'endPick' }, { frameId: 0 }); } catch { /* Closed tab. */ }
+    }
     await save(emptySession()); await syncScripts(); await reconcile();
     return { ok: true };
   }
@@ -218,6 +221,20 @@ chrome.tabs.onUpdated.addListener((id, change) => {
       const state = await session(); delete state.observations[id]; delete state.pending[id]; delete state.picking[id];
       for (const [key, p] of Object.entries(state.pending)) if (p.sourceId === id) delete state.pending[key];
       await save(state);
+    }
+    if (change.status === 'complete') {
+      // document_idle can run before slow subresources finish. Reannounce after
+      // the loading guard lifts, even if the DOM's completion state is unchanged.
+      const config = await settings();
+      const tab = await getTab(id);
+      if (config.enabled && tab?.url) {
+        for (const rule of config.rules) {
+          if (rule.enabled && matchesPattern(rule.pattern, tab.url) && await allowed(rule)) {
+            try { await inject(id); } catch { /* Restricted/discarded page: leave open. */ }
+            break;
+          }
+        }
+      }
     }
     if (change.status === 'complete' || change.url || change.pinned !== undefined) await reconcile();
   });

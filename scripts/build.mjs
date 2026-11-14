@@ -6,6 +6,7 @@ if (pkg.version !== manifest.version) throw new Error('Package and manifest vers
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist');
 await cp('public', 'dist', { recursive: true });
+await cp('LICENSE', 'dist/LICENSE');
 await build({ entryPoints: ['src/background.ts','src/ui.ts'], outdir: 'dist', bundle: true, format: 'esm', target: 'chrome120' });
 await build({ entryPoints: ['src/content.ts'], outdir: 'dist', bundle: true, format: 'iife', target: 'chrome120' });
 console.log('Load unpacked: dist/');
