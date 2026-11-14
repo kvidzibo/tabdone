@@ -1,6 +1,6 @@
 import { defaults, groupUrl, hostPermission, inGroup, matchesPattern, validateRule, type Rule, type Settings } from './core';
 
-type Observation = { url: string; ruleIds: string[]; documentId: string };
+type Observation = { url: string; ruleIds: string[]; armedRuleIds: string[]; documentId: string };
 type Pending = { url: string; ruleId: string; sourceId: number; base: string };
 type Session = { observations: Record<string, Observation>; pending: Record<string, Pending>; picking: Record<string, boolean>; picked?: { tabId: number; url: string; selector: string; text: string } };
 const emptySession = (): Session => ({ observations: {}, pending: {}, picking: {} });
@@ -59,6 +59,7 @@ async function arm(state: Session, config: Settings) {
     // Active tabs in ANY window stay open; switching apps never triggers closure.
     if (source.active || state.picking[key]) continue;
     for (const ruleId of observation.ruleIds) {
+      if (observation.armedRuleIds.includes(ruleId)) continue;
       const rule = config.rules.find(r => r.id === ruleId && r.enabled);
       if (!rule || !matchesPattern(rule.pattern, source.url!) || !await allowed(rule)) continue;
       const proof = await inspect(sourceId, rule, observation.url, observation.documentId);
@@ -71,6 +72,7 @@ async function arm(state: Session, config: Settings) {
           state.pending[tab.id] = { url: tab.url, ruleId, sourceId, base };
         }
       }
+      observation.armedRuleIds.push(ruleId);
     }
   }
 }
@@ -143,8 +145,12 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
       if (config.enabled && !msg.dirty && !state.picking[id] && Array.isArray(msg.readyRuleIds)) {
         for (const rule of config.rules) if (rule.enabled && msg.readyRuleIds.includes(rule.id) && matchesPattern(rule.pattern, msg.url) && await allowed(rule)) ids.push(rule.id);
       }
-      if (ids.length && sender.documentId) state.observations[id] = { url: msg.url, ruleIds: ids, documentId: sender.documentId };
-      else delete state.observations[id];
+      const previous = state.observations[id];
+      if (ids.length && sender.documentId) {
+        const armedRuleIds = previous?.url === msg.url && previous.documentId === sender.documentId
+          ? previous.armedRuleIds.filter(ruleId => ids.includes(ruleId)) : [];
+        state.observations[id] = { url: msg.url, ruleIds: ids, armedRuleIds, documentId: sender.documentId };
+      } else delete state.observations[id];
       for (const [key, p] of Object.entries(state.pending)) if (p.sourceId === id && !ids.includes(p.ruleId)) delete state.pending[key];
       await save(state); await reconcile();
       return { ok: true };

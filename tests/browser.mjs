@@ -155,6 +155,19 @@ try {
   await until(async () => (await inspectText('Merged now')).matches, 'visible line-break matching');
   assert.equal((await inspectText('Mergednow')).matches, false);
   console.log('Initial completion and rendered text boundary regressions passed');
+
+  // An already-armed pinned source must not sweep tabs opened later.
+  const pinnedSource = await open('/owner/repo/pull/124');
+  const pinnedSourceId = await tabId(pinnedSource);
+  await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), pinnedSourceId);
+  await done(pinnedSource);
+  await until(async () => (await state()).observations[pinnedSourceId], 'pinned source completion');
+  await activate(other);
+  await until(async () => (await state()).observations[pinnedSourceId]?.armedRuleIds.length > 0, 'one-time group snapshot');
+  const later = await open('/owner/repo/pull/124/new');
+  await activate(other); await sleep(1200);
+  assert.equal(later.isClosed(), false, 'new incomplete related tabs are not swept by an old observation');
+  console.log('Completed groups queue only their initial tab snapshot');
   console.log(`Screenshots: ${shots}`);
 } finally {
   await context?.close(); await new Promise(r => server.close(r)); await rm(profile, { recursive: true, force: true });
