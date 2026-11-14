@@ -6,7 +6,8 @@ tabs when you switch tabs. No GitHub-specific logic, accounts, or backend.
 
 ## Install
 
-Requires Chrome/Chromium 120+.
+Requires Chrome/Chromium 120+. Building requires Node.js 22+; ZIP packaging
+and publisher tests also require the `zip` and `unzip` command-line tools.
 
 1. Build from source with Node.js 22+:
    ```sh
@@ -17,10 +18,12 @@ Requires Chrome/Chromium 120+.
    and select `dist/`.
 3. Pin TabDone to the toolbar.
 
-`npm run zip` creates `tabdone-0.1.0.zip`. Unzip it before **Load unpacked**.
+`npm run zip` creates `tabdone-<version>.zip`. Unzip it before **Load unpacked**.
 The [CI workflow](https://github.com/kvidzibo/tabdone/actions/workflows/ci.yml)
 also provides a downloadable build artifact after successful runs.
-There is no Chrome Web Store release or automatic update mechanism yet.
+A Chrome Web Store listing is not configured yet. Once configured, release tags
+can submit updates automatically; see [Publishing](docs/publishing.md).
+Unpacked installations still require manual updates.
 
 ## Create a rule
 
@@ -86,7 +89,7 @@ No cookies, form values, API tokens, remote code, analytics, or external assets.
 ## Development
 
 ```sh
-npm run check       # TypeScript, URL/group tests, production build
+npm run check       # TypeScript, URL/group and publisher tests, production build
 npm run test:e2e    # Real extension in isolated Chromium
 npm run zip
 ```
