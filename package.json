@@ -1,6 +1,6 @@
 {
   "name": "tabdone",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Configurable, local-only automatic tab cleanup for Chromium.",
@@ -10,7 +10,7 @@
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "npm run build && xvfb-run -a dbus-run-session -- node tests/browser.mjs",
     "check": "npm run typecheck && npm test && npm run build",
-    "zip": "npm run build && cd dist && zip -qr ../tabdone-0.1.0.zip ."
+    "zip": "npm run build && node scripts/zip.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.37",
