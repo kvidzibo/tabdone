@@ -1,6 +1,6 @@
 # Chrome Web Store submission materials
 
-Prepared for TabDone 0.2.0. Review these statements before certifying or submitting
+Prepared for TabDone 0.2.1. Review these statements before certifying or submitting
 in the developer dashboard. Nothing in this document submits or publishes an item.
 See [Publishing](publishing.md) for account setup and subsequent automated updates.
 
@@ -140,7 +140,7 @@ data; that page is not part of the installed extension.
 
 ## Upload checklist
 
-- Upload `tabdone-0.2.0.zip`, with `manifest.json` at the ZIP root; do not zip the repository.
+- Upload `tabdone-0.2.1.zip`, with `manifest.json` at the ZIP root; do not zip the repository.
 - Use the existing `public/icons/128.png` store icon.
 - Supply at least one actual-use screenshot at **1280×800** or **640×400**, with no
   added padding. Prepared screenshots are handed off separately, not committed.
