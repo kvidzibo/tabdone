@@ -200,8 +200,7 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
   }
   if (msg.type === 'saveSettings') {
     // Only setCloseDuplicates changes that preference; UI snapshots here can be stale.
-    const stored = (await chrome.storage.local.get('settings')).settings as Settings | undefined;
-    const config: Settings = { enabled: msg.config.enabled === true, closeDuplicates: stored?.closeDuplicates !== false, rules: msg.config.rules.map(validateRule) };
+    const config: Settings = { enabled: msg.config.enabled === true, closeDuplicates: (await settings()).closeDuplicates, rules: msg.config.rules.map(validateRule) };
     if (config.rules.length > 100 || new Set(config.rules.map(r => r.id)).size !== config.rules.length) throw new Error('Use at most 100 rules with unique IDs.');
     for (const rule of config.rules) if (config.enabled && rule.enabled && !await allowed(rule)) throw new Error('Grant site access before enabling this rule.');
     await chrome.storage.local.set({ settings: config });

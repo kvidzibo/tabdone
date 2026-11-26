@@ -217,7 +217,7 @@ try {
   await sleep(800); assert.equal(keptOld.isClosed(), false, 'disabled setting keeps duplicates');
   assert.equal(later.isClosed(), false, 'changing the duplicate setting keeps rule state');
   // A stale rule/pause save must not re-enable it.
-  await editor2.evaluate(async () => { const { config } = await chrome.runtime.sendMessage({ type: 'status' }); await chrome.runtime.sendMessage({ type: 'saveSettings', config: { ...config, closeDuplicates: true } }); });
+  assert.deepEqual(await editor2.evaluate(async () => { const { config } = await chrome.runtime.sendMessage({ type: 'status' }); return chrome.runtime.sendMessage({ type: 'saveSettings', config: { ...config, closeDuplicates: true } }); }), { ok: true });
   assert.equal((await worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings)).closeDuplicates, false);
   console.log('Exact duplicate closing, protections, and setting passed');
   console.log(`Screenshots: ${shots}`);
