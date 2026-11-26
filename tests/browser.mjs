@@ -203,15 +203,22 @@ try {
   await until(async () => (await inspectTab(editedId))?.dirty, 'edit detected');
   await activate(other); await open('/owner/repo/pull/dup');
   await sleep(800); assert.equal(edited.isClosed(), false, 'an edited watched page stays open');
+  const editor2 = await context.newPage(); await editor2.goto(`${ext}/options.html`);
+  await until(async () => (await editor2.locator('#rule-list').innerText()).includes('Merged PRs'), 'Manage rules page loads');
   // The second click lands while the first is saving; the checkbox must show the saved state.
   await editor.bringToFront(); await editor.locator('#close-duplicates').evaluate(box => { box.click(); box.click(); });
   await until(() => worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings.closeDuplicates === false), 'duplicate setting saved');
   await sleep(300); assert.equal(await editor.locator('#close-duplicates').isChecked(), false);
+  await until(async () => !await editor2.locator('#close-duplicates').isChecked(), 'other settings pages sync');
+  assert.equal(await editor2.locator('#error').innerText(), '', 'Manage rules page initializes');
   await editor.screenshot({ path: join(shots, 'settings.png'), fullPage: true });
   const keptOld = await open('/docs/off');
   await activate(other); await open('/docs/off');
   await sleep(800); assert.equal(keptOld.isClosed(), false, 'disabled setting keeps duplicates');
   assert.equal(later.isClosed(), false, 'changing the duplicate setting keeps rule state');
+  // A stale rule/pause save must not re-enable it.
+  await editor2.evaluate(async () => { const { config } = await chrome.runtime.sendMessage({ type: 'status' }); await chrome.runtime.sendMessage({ type: 'saveSettings', config: { ...config, closeDuplicates: true } }); });
+  assert.equal((await worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings)).closeDuplicates, false);
   console.log('Exact duplicate closing, protections, and setting passed');
   console.log(`Screenshots: ${shots}`);
 } finally {

@@ -100,7 +100,7 @@ async function storeDraft() {
 async function receivePick() {
   const status = await send({ type: 'status', tabId: sourceId });
   const picked = status.state.picked;
-  if (picked?.tabId === sourceId && JSON.stringify(picked) !== lastPick) {
+  if (picked && picked.tabId === sourceId && JSON.stringify(picked) !== lastPick) {
     lastPick = JSON.stringify(picked);
     input('selector').value = picked.selector; input('text').value = picked.text;
     $('test-result').textContent = 'Element selected. Test this rule, then save.';
@@ -180,7 +180,14 @@ toggle('global-enabled', async enabled => {
   await send({ type: 'saveSettings', config: { ...fresh.config, enabled } }); config = { ...fresh.config, enabled };
 });
 if (!popup) toggle('close-duplicates', async value => {
-  await send({ type: 'setCloseDuplicates', value }); config = { ...config, closeDuplicates: value };
+  await send({ type: 'setCloseDuplicates', value });
+});
+// Keep switches in sync with saves from other TabDone pages, including during startup.
+if (!popup) chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.settings) return;
+  const saved = changes.settings.newValue as Partial<Settings> | undefined;
+  input('global-enabled').checked = saved?.enabled === true;
+  input('close-duplicates').checked = saved?.closeDuplicates !== false;
 });
 if (popup) {
   $('new-rule').onclick = () => { void openEditor(sourceId); };
