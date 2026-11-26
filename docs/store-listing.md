@@ -1,6 +1,6 @@
 # Chrome Web Store submission materials
 
-Prepared for TabDone 0.2.1. Review these statements before certifying or submitting
+Prepared for TabDone 0.3.0. Review these statements before certifying or submitting
 in the developer dashboard. Nothing in this document submits or publishes an item.
 See [Publishing](publishing.md) for account setup and subsequent automated updates.
 
@@ -23,7 +23,7 @@ in the dashboard yourself; they are not supplied by this repository.
 
 TabDone automatically closes finished tabs using rules you define. Choose a page
 element that signals completion, match its visible text, and let TabDone clear
-eligible tabs when you switch away. No service-specific integration is required.
+eligible tabs after you leave the browser. No service-specific integration is required.
 
 Create a rule on a page, pick its completion indicator, and test the match before
 saving. URL patterns let one rule cover similar pages. Optionally close tabs at
@@ -34,11 +34,11 @@ Features:
 - Match exact, case-sensitive text with normalized whitespace.
 - See watching/done status and matching-tab counts in the toolbar popup.
 - Pause globally, disable individual rules, or edit and delete them at any time.
-- Close the older tab when the exact same URL opens again (on by default; can be turned off).
+- Close duplicate tabs with exactly the same URL (on by default; can be turned off or limited by rules).
 - Keep pinned tabs, selected tabs in every window, and pages with detected edits open.
 
-Active completed tabs wait until you switch tabs. A completed background tab can
-close immediately. Switching applications alone does not close a selected tab.
+Tabs close only after you switch to another application, never while you browse;
+on some Linux systems this can take up to 30 seconds. Selected tabs stay open.
 Edit detection is conservative, not a guarantee that every site's unsaved work
 will be recognized. Test rules carefully: broad selectors or close scopes can
 close unintended tabs, and changing website markup can require rule updates.
@@ -49,7 +49,7 @@ tab state and drafts stay in session storage. The extension transmits none of
 this data to the developer or third parties. No account, analytics or backend is
 required. Site access is requested when you pick, test or enable a rule.
 
-Requires Chrome/Chromium 120 or newer. Supports top-level HTTP(S) pages, not browser
+Requires Chrome/Chromium 121 or newer. Supports top-level HTTP(S) pages, not browser
 internal pages, iframe contents or shadow-DOM selection. A site's completion
 indicator must update on the page; TabDone does not poll service APIs.
 
@@ -59,14 +59,17 @@ indicator must update on the page; TabDone does not poll service APIs.
 
 Automatically close completed browser tabs and optionally related tabs, using
 user-defined URL patterns and visible page-completion indicators, and close
-older duplicate tabs when the exact same URL opens again.
+duplicate tabs showing exactly the same URL.
 
 ### Permission justifications
 
 **tabs:** Read URLs and state of open tabs to match user-defined rules, count and
-group related tabs, find older tabs with exactly the same URL, and check
-selection/pinning before closing eligible tabs.
+group related tabs, find tabs with exactly the same URL, and check
+selection/pinning/last use before closing eligible tabs.
 TabDone does not request the history permission or store a browsing-history log.
+
+**alarms:** Check every 30 seconds whether any browser window has focus, because
+some platforms do not report the browser losing focus. Tabs close only while it is unfocused.
 
 **scripting:** Inject the bundled element picker and completion observer into
 permitted sites. They locate selected page elements, match visible text and detect
@@ -119,17 +122,18 @@ No account, subscription, backend or credentials are required.
    the README heading's **TabDone** text. The editor should receive a generated
    CSS selector and the visible text `TabDone`.
 5. Choose **Test on page**. Expect one visible text match and “completion detected”.
-6. Choose **Save rule**. The source page is already complete and is now in the
-   background, so it should close; the editor stays open.
-7. Open the same repository URL again and keep it selected. It should stay open;
-   the popup should show **Done — closes when you leave** once the README loads.
-   Switch to a different tab to allow the completed repository tab to close.
-8. Open `https://github.com/kvidzibo/tabdone/issues`, switch to another tab, then open
-   the same URL in a new tab. The older issues tab should close. **Manage rules** →
-   **Settings** → **Close older duplicate tabs** turns this off.
-9. Pause TabDone using the popup's global switch. Open the repository page again
-   and switch away; it should remain open. Delete the demo rule under **Manage rules**
-   before resuming if you no longer want this behavior.
+6. Choose **Save rule**, keeping the editor selected. The source page is complete
+   and in the background. Switch to another application for up to 30 seconds;
+   the repository tab should close and the editor stays open.
+7. Open the same repository URL again and keep it selected. The popup should show
+   **Done — closes when you leave the browser** once the README loads. Switch to a
+   different tab, then to another application; the repository tab should close.
+8. Open `https://github.com/kvidzibo/tabdone/issues` twice in two tabs, select a third
+   tab, then switch to another application. One issues tab should close.
+   **Manage rules** → **Settings** → **Close duplicate tabs** turns this off.
+9. Pause TabDone using the popup's global switch. Open the repository page again,
+   switch to another tab and then another application; it should remain open.
+   Delete the demo rule under **Manage rules** before resuming if you no longer want this behavior.
 
 This is a deliberately simple demonstration: the static README heading acts as
 an already-complete indicator. Normal rules target changing completion statuses.
@@ -140,7 +144,7 @@ data; that page is not part of the installed extension.
 
 ## Upload checklist
 
-- Upload `tabdone-0.2.1.zip`, with `manifest.json` at the ZIP root; do not zip the repository.
+- Upload `tabdone-0.3.0.zip`, with `manifest.json` at the ZIP root; do not zip the repository.
 - Use the existing `public/icons/128.png` store icon.
 - Supply at least one actual-use screenshot at **1280×800** or **640×400**, with no
   added padding. Prepared screenshots are handed off separately, not committed.

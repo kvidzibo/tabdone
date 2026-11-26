@@ -17,3 +17,12 @@ test('URL rules and safe group boundaries for a reusable PR rule', () => {
   assert.equal(normalizedText('  Merged\n  now '), 'Merged now');
   assert.throws(() => validateRule({}));
 });
+
+test('rule types: legacy rules close; keep-duplicates rules need only a name and pattern', () => {
+  const legacy = { id: 'a', name: 'PRs', pattern: 'https://github.com/**', selector: '#s', text: 'Merged', baseDepth: 4, closeRelated: true, enabled: true };
+  assert.equal(validateRule(legacy).type, 'close');
+  assert.deepEqual(validateRule({ id: 'b', type: 'keepDuplicates', name: ' Docs ', pattern: 'https://example.com/**', enabled: true, selector: 'x' }),
+    { id: 'b', type: 'keepDuplicates', name: 'Docs', pattern: 'https://example.com/**', selector: '', text: '', baseDepth: 0, closeRelated: false, enabled: true });
+  assert.throws(() => validateRule({ id: 'c', type: 'keepDuplicates', name: 'Bad', pattern: 'example.com', enabled: true }));
+  assert.throws(() => validateRule({ ...legacy, type: 'other' }));
+});

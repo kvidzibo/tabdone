@@ -1,5 +1,8 @@
+// "close" closes completed pages; "keepDuplicates" only excludes pages from the duplicate sweep.
+export type RuleType = "close" | "keepDuplicates";
 export interface Rule {
   id: string;
+  type: RuleType;
   name: string;
   pattern: string;
   selector: string;
@@ -66,7 +69,16 @@ export function inGroup(raw: string, base: string): boolean {
 }
 export function validateRule(value: unknown): Rule {
   const r = value as Rule;
-  if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.id ||
+  if (r && typeof r === "object" && r.type === "keepDuplicates") {
+    if (typeof r.id !== "string" || !r.id || typeof r.name !== "string" || !r.name.trim() || r.name.length > 100 ||
+        typeof r.pattern !== "string" || r.pattern.length > 2000 || typeof r.enabled !== "boolean")
+      throw new Error("Complete the rule name and URL pattern.");
+    patternParts(r.pattern);
+    return { id:r.id, type:"keepDuplicates", name:r.name.trim(), pattern:r.pattern, selector:"", text:"",
+      baseDepth:0, closeRelated:false, enabled:r.enabled };
+  }
+  // Rules saved before rule types existed are completion rules.
+  if (!r || typeof r !== "object" || (r.type !== undefined && r.type !== "close") || typeof r.id !== "string" || !r.id ||
       typeof r.name !== "string" || !r.name.trim() || r.name.length > 100 ||
       typeof r.pattern !== "string" || r.pattern.length > 2000 ||
       typeof r.selector !== "string" || !r.selector.trim() || r.selector.length > 2000 ||
@@ -75,6 +87,6 @@ export function validateRule(value: unknown): Rule {
       typeof r.closeRelated !== "boolean" || typeof r.enabled !== "boolean")
     throw new Error("Complete the rule name, URL pattern, and completion selector.");
   patternParts(r.pattern);
-  return { id:r.id, name:r.name.trim(), pattern:r.pattern, selector:r.selector, text:normalizedText(r.text),
+  return { id:r.id, type:"close", name:r.name.trim(), pattern:r.pattern, selector:r.selector, text:normalizedText(r.text),
     baseDepth:r.baseDepth, closeRelated:r.closeRelated, enabled:r.enabled };
 }

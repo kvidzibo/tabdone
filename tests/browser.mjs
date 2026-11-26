@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { execFileSync, spawn } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import assert from 'node:assert/strict';
 
@@ -17,7 +18,7 @@ const server = createServer((_req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const extension = resolve('dist');
-let context;
+let context, away;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function until(fn, label, timeout = 10000) {
   const deadline = Date.now() + timeout;
@@ -30,6 +31,10 @@ try {
     viewport: { width: 1160, height: 1000 },
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--no-first-run', '--no-default-browser-check'],
   });
+  // Another app's window to switch to: ImageMagick's built-in logo, titled for lookup.
+  away = spawn('display', ['-title', 'tabdone-away', '-geometry', '+700+700', 'logo:'], { stdio: 'ignore' });
+  let awayWindow;
+  await until(() => { try { awayWindow = execFileSync('xdotool', ['search', '--name', 'tabdone-away']).toString().trim().split('\n')[0]; return true; } catch { return false; } }, 'other app window');
   let worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   const id = new URL(worker.url()).host;
   const ext = `chrome-extension://${id}`;
@@ -42,7 +47,6 @@ try {
   // Chromium's optional-host permission confirmation is a native browser prompt.
   // Test-only, isolated X display: accept it with Return if shown.
   await sleep(600);
-  const { execFileSync } = await import('node:child_process');
   execFileSync('import', ['-window', 'root', join(shots, 'permission-prompt.png')]);
   execFileSync('xdotool', ['key', 'Shift+Tab', 'Return']);
   await sleep(800);
@@ -70,6 +74,23 @@ try {
   async function activate(page) { await worker.evaluate(id => chrome.tabs.update(id, { active: true }), await tabId(page)); }
   async function state() { return worker.evaluate(async () => (await chrome.storage.session.get('state')).state); }
   async function done(page) { await page.evaluate(() => document.querySelector('#status').textContent = 'Merged'); }
+  const focused = () => worker.evaluate(async () => (await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'panel', 'app', 'devtools'] })).some(w => w.focused));
+  const exists = id => worker.evaluate(async id => { try { await chrome.tabs.get(id); return true; } catch { return false; } }, id);
+  const mainWindow = await worker.evaluate(async id => (await chrome.tabs.get(id)).windowId, sourceId);
+  // Leave the browser for another X window, as when switching apps. Chromium on X11
+  // reports no focus event, so fire the periodic check now instead of waiting 30 seconds
+  // (unpacked extensions are exempt from the alarm minimum).
+  async function leave() {
+    execFileSync('xdotool', ['windowfocus', '--sync', awayWindow]);
+    await until(async () => !await focused(), 'browser loses focus');
+    await worker.evaluate(() => chrome.alarms.create('sweep', { when: Date.now(), periodInMinutes: 0.5 }));
+  }
+  async function back() {
+    await worker.evaluate(id => chrome.windows.update(id, { focused: true }), mainWindow);
+    await until(focused, 'browser regains focus');
+  }
+  // Negative checks: give a triggered sweep time to finish.
+  async function awayFor(ms = 1500) { await leave(); await sleep(ms); await back(); }
   const sibling = await open('/owner/repo/pull/118/commits');
   const pinned = await open('/owner/repo/pull/118/changes');
   await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), await tabId(pinned));
@@ -85,39 +106,48 @@ try {
   await until(async () => (await popupPage.locator('#page-status').innerText()).includes('Done'), 'popup ready state');
   await popupPage.screenshot({ path: join(shots, 'popup.png'), clip: { x: 0, y: 0, width: 340, height: 460 } });
   await popupPage.close();
-  // Leaving to a sibling protects that active sibling, closing only the old source.
-  await activate(sibling);
-  await until(() => source.isClosed(), 'source closes after leaving');
+  // Switching tabs alone closes nothing.
+  await activate(sibling); await sleep(1000);
+  assert.equal(source.isClosed(), false, 'tab switches never close tabs');
+  // Leaving the browser closes the old source; the selected sibling stays.
+  await leave(); await until(() => source.isClosed(), 'source closes after leaving the browser'); await back();
   assert.equal(sibling.isClosed(), false); assert.equal(pinned.isClosed(), false); assert.equal(dirty.isClosed(), false); assert.equal(other.isClosed(), false);
-  await activate(other); await until(() => sibling.isClosed(), 'active sibling closes only after leaving');
+  await activate(other); await leave(); await until(() => sibling.isClosed(), 'queued sibling closes once no longer selected'); await back();
   assert.equal(pinned.isClosed(), false); assert.equal(dirty.isClosed(), false);
-  console.log('Grouping, active sibling, pinned, dirty, URL boundary safeguards passed');
+  console.log('Focus-loss closing, grouping, selected sibling, pinned, dirty, URL boundary safeguards passed');
 
   // Hidden completion indicators must never arm a group.
   const hidden = await open('/owner/repo/pull/119'); await hidden.evaluate(() => { const s=document.querySelector('#status'); s.textContent='Merged'; s.style.display='none'; });
-  await sleep(1200); await activate(other); await sleep(500); assert.equal(hidden.isClosed(), false);
-  // Rule applies to other PR numbers, and observes a background page immediately.
+  const hiddenId = await tabId(hidden);
+  await sleep(1200); await activate(other); await awayFor(); assert.equal(hidden.isClosed(), false);
+  // Rule applies to other PR numbers; background completion waits for focus loss.
   await hidden.evaluate(() => document.querySelector('#status').style.display = 'inline-block');
-  await until(() => hidden.isClosed(), 'background completion');
+  await until(async () => (await state()).observations[hiddenId], 'background completion detected');
+  await sleep(1000); assert.equal(hidden.isClosed(), false, 'background completion waits until you leave');
+  await leave(); await until(() => hidden.isClosed(), 'background completion closes after leaving'); await back();
 
   const pausePage = await open('/owner/repo/pull/120');
   await editor.bringToFront(); await editor.locator('#global-enabled').uncheck();
   await until(() => worker.evaluate(async () => !(await chrome.storage.local.get('settings')).settings.enabled), 'pause saved');
-  await done(pausePage); await activate(other); await sleep(1200); assert.equal(pausePage.isClosed(), false);
+  await done(pausePage); await activate(other); await awayFor(); assert.equal(pausePage.isClosed(), false);
   await editor.locator('#global-enabled').check();
-  await until(() => pausePage.isClosed(), 'resume rechecks background completion');
+  const pauseId = await tabId(pausePage);
+  await until(async () => (await state()).observations[pauseId], 'resume rechecks completion');
+  await activate(other); await leave(); await until(() => pausePage.isClosed(), 'resumed completion closes after leaving'); await back();
   console.log('Hidden indicators, reusable groups, background completion, pause/resume passed');
 
   const navigation = await open('/owner/repo/pull/121'); await done(navigation);
   const navigationId = await tabId(navigation);
   await until(async () => (await state()).observations[navigationId], 'ready before navigation');
-  await navigation.goto(origin + '/unrelated'); await activate(other); await sleep(1000); assert.equal(navigation.isClosed(), false);
+  await navigation.goto(origin + '/unrelated'); await activate(other); await awayFor(); assert.equal(navigation.isClosed(), false);
   console.log('Navigation invalidates stale completion');
 
-  // A suspended MV3 worker must restore pending completion from session storage.
+  // A suspended MV3 worker must restore completion from session storage, and the real
+  // 30-second alarm must wake it after the browser loses focus without any focus event.
   const restart = await open('/owner/repo/pull/122'); await done(restart);
   const restartId = await tabId(restart);
   await until(async () => (await state()).observations[restartId], 'completion saved before worker restart');
+  await activate(other);
   const cdp = await context.newCDPSession(other);
   let versions = [];
   cdp.on('ServiceWorker.workerVersionUpdated', event => { versions = event.versions; });
@@ -125,26 +155,26 @@ try {
   await until(() => versions.some(v => v.scriptURL === worker.url() && v.runningStatus === 'running'), 'service worker version');
   const versionId = versions.find(v => v.scriptURL === worker.url() && v.runningStatus === 'running').versionId;
   await cdp.send('ServiceWorker.stopWorker', { versionId });
-  await other.bringToFront();
-  await until(() => restart.isClosed(), 'completion survives worker restart');
+  execFileSync('xdotool', ['windowfocus', '--sync', awayWindow]);
+  await until(() => restart.isClosed(), 'periodic check closes completion after worker restart', 45000);
   worker = context.serviceWorkers().find(w => w.url() === ext + '/background.js') || await context.waitForEvent('serviceworker');
-  await cdp.detach();
-  console.log('Service-worker restart preserves completion');
+  await cdp.detach(); await back();
+  console.log('Service-worker restart and periodic focus check passed');
 
-  // Native focus moving away is not a close trigger; another window's selected tab stays protected.
+  // Another window's selected tab stays protected while the browser is unfocused.
   const multi = await open('/owner/repo/pull/123');
   const multiId = await tabId(multi);
   await worker.evaluate(id => chrome.windows.create({ tabId: id, focused: true }), multiId);
   await done(multi); await until(async () => (await state()).observations[multiId], 'completion in second window');
-  await activate(other); await sleep(500); assert.equal(multi.isClosed(), false);
+  await activate(other); await awayFor(); assert.equal(multi.isClosed(), false);
   const second = await worker.evaluate(async id => { const tab=await chrome.tabs.get(id); return chrome.tabs.create({windowId:tab.windowId,url:'about:blank',active:true}); }, multiId);
-  await until(() => multi.isClosed(), 'second-window tab closes when its selection changes');
+  await leave(); await until(() => multi.isClosed(), 'second-window tab closes once deselected'); await back();
   await worker.evaluate(id => chrome.tabs.remove(id), second.id);
-  console.log('Active tabs in unfocused windows remain protected');
+  console.log('Selected tabs in unfocused windows remain protected');
   const initial = await open('/owner/repo/pull/initial');
   const initialId = await tabId(initial);
   await until(async () => (await state()).observations[initialId], 'initial completion with delayed page load');
-  await activate(other); await until(() => initial.isClosed(), 'initially complete page closes after leaving');
+  await activate(other); await leave(); await until(() => initial.isClosed(), 'initially complete page closes after leaving'); await back();
 
   // Rendered line breaks are whitespace, never concatenated words.
   const textPage = await open('/owner/repo/pull/text');
@@ -162,39 +192,42 @@ try {
   await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), pinnedSourceId);
   await done(pinnedSource);
   await until(async () => (await state()).observations[pinnedSourceId], 'pinned source completion');
-  await activate(other);
-  await until(async () => (await state()).observations[pinnedSourceId]?.armedRuleIds.length > 0, 'one-time group snapshot');
+  await activate(other); await leave();
+  await until(async () => (await state()).observations[pinnedSourceId]?.armedRuleIds.length > 0, 'one-time group snapshot'); await back();
   const later = await open('/owner/repo/pull/124/new');
-  await activate(other); await sleep(1200);
+  await activate(other); await awayFor();
   assert.equal(later.isClosed(), false, 'new incomplete related tabs are not swept by an old observation');
   console.log('Completed groups queue only their initial tab snapshot');
 
-  // Exact-URL duplicates: a tab that commits a URL replaces older, unprotected tabs.
+  // Exact-URL duplicates close only after leaving the browser.
   assert.equal((await worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings)).closeDuplicates, true, 'on by default');
   const dupUrl = origin + '/docs/page?x=1#top';
   await activate(other);
   const older = await open('/docs/page?x=1#top');
   const variant = await open('/docs/page?x=2#top');
   const newer = await open('/docs/page?x=1#top');
-  await until(() => older.isClosed(), 'older exact duplicate closes');
-  assert.equal(variant.isClosed(), false, 'a different query stays open'); assert.equal(newer.isClosed(), false);
-  const burst = await worker.evaluate(async url => {
-    const commits = [];
-    chrome.tabs.onUpdated.addListener((id, change) => { if (change.url === url) commits.push(id); });
-    await Promise.all([1, 2].map(() => chrome.tabs.create({ url, active: false })));
-    await new Promise(r => setTimeout(r, 1500));
-    return { commits, kept: (await chrome.tabs.query({})).filter(t => t.url === url).map(t => t.id) };
-  }, origin + '/docs/burst');
-  assert.deepEqual(burst.kept, [burst.commits.at(-1)], 'the last tab to commit survives near-simultaneous opens');
+  await sleep(1000); assert.equal(older.isClosed(), false, 'opening a duplicate closes nothing while you browse');
+  await leave(); await until(() => older.isClosed(), 'unselected duplicate closes after leaving'); await back();
+  assert.equal(variant.isClosed(), false, 'a different query stays open'); assert.equal(newer.isClosed(), false, 'the selected copy stays open');
+  // Without a selected copy, the most recently used one stays.
+  const recent = await worker.evaluate(async url => {
+    const tabs = await Promise.all([1, 2].map(() => chrome.tabs.create({ url, active: false })));
+    return tabs.map(t => t.id);
+  }, origin + '/docs/recent');
+  await until(async () => (await worker.evaluate(async ids => Promise.all(ids.map(async id => (await chrome.tabs.get(id)).status)), recent)).every(s => s === 'complete'), 'background copies load');
+  await worker.evaluate(id => chrome.tabs.update(id, { active: true }), recent[0]);
+  await activate(other); await leave();
+  await until(async () => !await exists(recent[1]), 'less recently used copy closes'); await back();
+  assert.equal(await exists(recent[0]), true, 'most recently used copy stays');
   const newerId = await tabId(newer);
   await activate(newer);
   const background = await worker.evaluate(url => chrome.tabs.create({ url, active: false }), dupUrl);
   await until(() => worker.evaluate(async id => (await chrome.tabs.get(id)).status === 'complete', background.id), 'background duplicate loads');
-  await sleep(800); assert.equal(newer.isClosed(), false, 'the selected tab stays open');
-  await worker.evaluate(id => chrome.tabs.remove(id), background.id);
+  await leave(); await until(async () => !await exists(background.id), 'newer background copy of the selected tab closes'); await back();
+  assert.equal(newer.isClosed(), false, 'the selected tab stays open');
   await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), newerId);
   await activate(other); await open('/docs/page?x=1#top');
-  await sleep(800); assert.equal(newer.isClosed(), false, 'a pinned tab stays open');
+  await awayFor(); assert.equal(newer.isClosed(), false, 'a pinned tab stays open');
   const inspectTab = id => worker.evaluate(async id => { try { return await chrome.tabs.sendMessage(id, { type: 'inspect' }, { frameId: 0 }); } catch { return undefined; } }, id);
   const edited = await open('/owner/repo/pull/dup');
   const editedId = await tabId(edited);
@@ -202,7 +235,7 @@ try {
   await edited.locator('textarea').fill('Unsaved comment');
   await until(async () => (await inspectTab(editedId))?.dirty, 'edit detected');
   await activate(other); await open('/owner/repo/pull/dup');
-  await sleep(800); assert.equal(edited.isClosed(), false, 'an edited watched page stays open');
+  await awayFor(); assert.equal(edited.isClosed(), false, 'an edited watched page stays open');
   const editor2 = await context.newPage(); await editor2.goto(`${ext}/options.html`);
   await until(async () => (await editor2.locator('#rule-list').innerText()).includes('Merged PRs'), 'Manage rules page loads');
   // The second click lands while the first is saving; the checkbox must show the saved state.
@@ -214,13 +247,26 @@ try {
   await editor.screenshot({ path: join(shots, 'settings.png'), fullPage: true });
   const keptOld = await open('/docs/off');
   await activate(other); await open('/docs/off');
-  await sleep(800); assert.equal(keptOld.isClosed(), false, 'disabled setting keeps duplicates');
+  await activate(other); await awayFor(); assert.equal(keptOld.isClosed(), false, 'disabled setting keeps duplicates');
   assert.equal(later.isClosed(), false, 'changing the duplicate setting keeps rule state');
   // A stale rule/pause save must not re-enable it.
   assert.deepEqual(await editor2.evaluate(async () => { const { config } = await chrome.runtime.sendMessage({ type: 'status' }); return chrome.runtime.sendMessage({ type: 'saveSettings', config: { ...config, closeDuplicates: true } }); }), { ok: true });
   assert.equal((await worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings)).closeDuplicates, false);
-  console.log('Exact duplicate closing, protections, and setting passed');
+  // A keep-duplicates rule, created through the editor, excludes matching pages.
+  await editor.bringToFront(); await editor.locator('#blank-rule').click();
+  await editor.locator('#rule-type').selectOption('keepDuplicates');
+  assert.equal(await editor.locator('#completion-fields').isVisible(), false, 'completion fields hidden');
+  await editor.locator('#name').fill('Keep docs'); await editor.locator('#pattern').fill(origin + '/docs/keep/**');
+  await editor.getByRole('button', { name: 'Save rule', exact: true }).click();
+  await until(async () => (await editor.locator('#saved').innerText()) === 'Rule saved.', 'save keep-duplicates rule');
+  assert.equal(await editor.locator('#error').innerText(), '');
+  assert.equal(await editor.locator('#rule-list').innerText().then(t => t.includes('Keeps duplicates open')), true);
+  await editor.screenshot({ path: join(shots, 'editor-keep.png'), fullPage: true });
+  const keepA = await open('/docs/keep/a'); await activate(other); const keepB = await open('/docs/keep/a');
+  await activate(other); await awayFor();
+  assert.equal(keepA.isClosed(), false, 'excluded duplicates stay open'); assert.equal(keepB.isClosed(), false);
+  console.log('Duplicate sweep, protections, keep-duplicates rule, and setting passed');
   console.log(`Screenshots: ${shots}`);
 } finally {
-  await context?.close(); await new Promise(r => server.close(r)); await rm(profile, { recursive: true, force: true });
+  away?.kill(); await context?.close(); await new Promise(r => server.close(r)); await rm(profile, { recursive: true, force: true });
 }
