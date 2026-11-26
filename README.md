@@ -2,7 +2,8 @@
 
 A Chrome/Chromium extension that closes finished tabs using rules you define.
 Pick a completion element, match its visible text, and close the page and related
-tabs when you switch tabs. No GitHub-specific logic, accounts, or backend.
+tabs when you switch tabs. It can also close older duplicate tabs.
+No GitHub-specific logic, accounts, or backend.
 
 ## Install
 
@@ -52,6 +53,15 @@ rule can therefore close that background page.
 The badge shows the current group count: gray while watching, purple when done,
 and **Ⅱ** when paused. Counts include protected tabs. The popup has a global pause;
 **Manage rules** lets you edit, disable, or delete rules.
+
+## Duplicate tabs
+
+**Close older duplicate tabs** is on by default; turn it off in **Manage rules** → **Settings**.
+When a tab loads or navigates to an HTTP(S) URL already open in another tab,
+TabDone closes the older tab. URLs must match exactly, including query and fragment.
+It needs no rule or site access. Pinned and selected tabs stay open, as do edited pages
+on watched sites; edits elsewhere cannot be detected. Incognito and normal tabs are
+never compared. The global pause stops it too.
 
 ## Safety and limitations
 
@@ -103,6 +113,7 @@ The Linux browser test requires `chromium`, `xvfb-run`, `dbus-run-session`,
 It uses a temporary profile, private display/D-Bus, and a local fixture server;
 it never touches your browser profile. Screenshots go to `/tmp/tabdone-screenshots`
 (or `TABDONE_SCREENSHOTS`). Tests cover picker/save, dynamic matching, grouped
-closing, active/pinned/edited tabs, navigation, pause, and worker restarts.
+closing, active/pinned/edited tabs, navigation, pause, worker restarts, and
+duplicate closing.
 
 MIT licensed.

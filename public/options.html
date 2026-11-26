@@ -1,7 +1,11 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TabDone — Rules</title><link rel="stylesheet" href="style.css"><script type="module" src="ui.js"></script></head>
 <body><div class="app"><header><div><h1><img src="icons/32.png" alt="">TabDone</h1><p class="muted">Finish a page. Leave the tab. Clear the clutter.</p></div><label class="switch"><input id="global-enabled" type="checkbox" aria-label="Enable TabDone"><span></span></label></header>
-<main class="layout"><aside><div class="section-heading"><h2>Rules</h2><button id="blank-rule" title="New rule">+ New</button></div><div id="rule-list"></div><p class="muted small">Everything stays on this device.</p></aside>
+<main class="layout"><aside><div class="section-heading"><h2>Rules</h2><button id="blank-rule" title="New rule">+ New</button></div><div id="rule-list"></div>
+<div class="section-heading settings-heading"><h2>Settings</h2></div>
+<label class="checkbox"><input id="close-duplicates" type="checkbox" checked>Close older duplicate tabs</label>
+<p class="hint">When a tab opens a page that is already open, the older tab closes. URLs must match exactly, including query and fragment.</p>
+<p class="muted small">Everything stays on this device.</p></aside>
 <section class="panel"><h2 id="editor-title">New rule</h2><form id="rule-form">
 <label for="name">Rule name</label><input id="name" maxlength="100" required placeholder="Merged PRs">
 <label for="pattern">Watch pages matching</label><input id="pattern" required spellcheck="false" placeholder="https://github.com/**/pull/**">
@@ -21,4 +25,4 @@
 <p class="hint">Site access is requested when picking, testing, or enabling a rule.</p>
 <footer><button id="delete" type="button" class="danger" hidden>Delete</button><button id="cancel" type="button">Cancel</button><button type="submit" class="primary">Save rule</button></footer>
 </form><p id="error" role="alert"></p><p id="saved" role="status"></p></section></main>
-<footer class="page-footer">TabDone 0.1.0 · No accounts, telemetry, or remote code.</footer></div></body></html>
+<footer class="page-footer">TabDone 0.2.0 · No accounts, telemetry, or remote code.</footer></div></body></html>

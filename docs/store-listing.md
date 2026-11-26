@@ -1,6 +1,6 @@
 # Chrome Web Store submission materials
 
-Prepared for TabDone 0.1.1. Review these statements before certifying or submitting
+Prepared for TabDone 0.2.0. Review these statements before certifying or submitting
 in the developer dashboard. Nothing in this document submits or publishes an item.
 See [Publishing](publishing.md) for account setup and subsequent automated updates.
 
@@ -34,6 +34,7 @@ Features:
 - Match exact, case-sensitive text with normalized whitespace.
 - See watching/done status and matching-tab counts in the toolbar popup.
 - Pause globally, disable individual rules, or edit and delete them at any time.
+- Close the older tab when the exact same URL opens again (on by default; can be turned off).
 - Keep pinned tabs, selected tabs in every window, and pages with detected edits open.
 
 Active completed tabs wait until you switch tabs. A completed background tab can
@@ -57,12 +58,14 @@ indicator must update on the page; TabDone does not poll service APIs.
 ### Single purpose
 
 Automatically close completed browser tabs and optionally related tabs, using
-user-defined URL patterns and visible page-completion indicators.
+user-defined URL patterns and visible page-completion indicators, and close
+older duplicate tabs when the exact same URL opens again.
 
 ### Permission justifications
 
 **tabs:** Read URLs and state of open tabs to match user-defined rules, count and
-group related tabs, and check selection/pinning before closing eligible tabs.
+group related tabs, find older tabs with exactly the same URL, and check
+selection/pinning before closing eligible tabs.
 TabDone does not request the history permission or store a browsing-history log.
 
 **scripting:** Inject the bundled element picker and completion observer into
@@ -90,8 +93,8 @@ Do not choose “no user data” solely because there is no server. Google's
 requires disclosure of local processing too. Review the dashboard's current labels
 and disclose these handled categories:
 
-- **Web history:** URLs of currently open tabs used for matching/grouping; no Chrome
-  history API access or persistent browsing-history log.
+- **Web history:** URLs of currently open tabs used for matching, grouping and
+  duplicate detection; no Chrome history API access or persistent browsing-history log.
 - **Website content:** Page elements/attributes and visible text used for picking
   and matching, with selectors and chosen completion text saved in rules.
 - **User activity:** Input/change event detection used only to flag edited pages;
@@ -121,7 +124,10 @@ No account, subscription, backend or credentials are required.
 7. Open the same repository URL again and keep it selected. It should stay open;
    the popup should show **Done — closes when you leave** once the README loads.
    Switch to a different tab to allow the completed repository tab to close.
-8. Pause TabDone using the popup's global switch. Open the repository page again
+8. Open `https://github.com/kvidzibo/tabdone/issues`, switch to another tab, then open
+   the same URL in a new tab. The older issues tab should close. **Manage rules** →
+   **Settings** → **Close older duplicate tabs** turns this off.
+9. Pause TabDone using the popup's global switch. Open the repository page again
    and switch away; it should remain open. Delete the demo rule under **Manage rules**
    before resuming if you no longer want this behavior.
 
@@ -134,7 +140,7 @@ data; that page is not part of the installed extension.
 
 ## Upload checklist
 
-- Upload `tabdone-0.1.1.zip`, with `manifest.json` at the ZIP root; do not zip the repository.
+- Upload `tabdone-0.2.0.zip`, with `manifest.json` at the ZIP root; do not zip the repository.
 - Use the existing `public/icons/128.png` store icon.
 - Supply at least one actual-use screenshot at **1280×800** or **640×400**, with no
   added padding. Prepared screenshots are handed off separately, not committed.

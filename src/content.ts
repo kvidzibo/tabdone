@@ -8,7 +8,7 @@ if (window === window.top) {
 }
 
 function start(): void {
-  let settings: Settings = { enabled: false, rules: [] };
+  let settings: Pick<Settings, "enabled" | "rules"> = { enabled: false, rules: [] };
   let settingsLoaded = false;
   let settingsRevision = 0;
   let dirty = false;
@@ -27,7 +27,7 @@ function start(): void {
     } catch { /* An unloaded extension must not interfere with the page. */ }
   }
 
-  function readSettings(value: unknown): Settings {
+  function readSettings(value: unknown): Pick<Settings, "enabled" | "rules"> {
     if (value === undefined) return { ...defaults, rules: [...defaults.rules] };
     if (!value || typeof value !== "object") return { enabled: false, rules: [] };
     const candidate = value as Partial<Settings>;

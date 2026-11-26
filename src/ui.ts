@@ -75,7 +75,7 @@ function renderScopes(depth: number) {
 function preview() {
   const depth = Number(input('scope').value);
   input('scope').disabled = !input('related').checked;
-  $('scope-preview').textContent = input('related').checked ? (sourceUrl ? `${groupUrl(sourceUrl, depth)} + /subpages; query and fragment ignored.` : `Group each matching page by its first ${depth} path segments.`) : 'Only the completed tab will close. Duplicate tabs stay open.';
+  $('scope-preview').textContent = input('related').checked ? (sourceUrl ? `${groupUrl(sourceUrl, depth)} + /subpages; query and fragment ignored.` : `Group each matching page by its first ${depth} path segments.`) : 'Only the completed tab will close. Other matching tabs stay open.';
 }
 function fill(rule?: Rule) {
   editingId = rule?.id || '';
@@ -109,7 +109,7 @@ async function receivePick() {
 }
 async function initEditor() {
   const status = await send({ type: 'status', tabId: sourceId }); config = status.config;
-  input('global-enabled').checked = config.enabled;
+  input('global-enabled').checked = config.enabled; input('close-duplicates').checked = config.closeDuplicates;
   if (sourceId && status.tab?.id === sourceId) {
     try { sourceUrl = pageUrl(status.tab.url).href; } catch { sourceId = undefined; }
   } else sourceId = undefined;
@@ -164,13 +164,17 @@ async function initEditor() {
     if (area === 'session' && changes.state) void receivePick().catch(error);
   });
 }
-input('global-enabled').onchange = () => { void run(async () => {
-  const fresh = await send({ type: 'status' });
-  const enabled = input('global-enabled').checked;
-  try { await send({ type: 'saveSettings', config: { ...fresh.config, enabled } }); config = { ...fresh.config, enabled }; }
-  catch (err) { input('global-enabled').checked = fresh.config.enabled; throw err; }
-  if (popup) await renderPopup();
-}); };
+function toggleSetting(id: string, key: 'enabled' | 'closeDuplicates') {
+  input(id).onchange = () => { void run(async () => {
+    const fresh = await send({ type: 'status' });
+    const value = input(id).checked;
+    try { await send({ type: 'saveSettings', config: { ...fresh.config, [key]: value } }); config = { ...fresh.config, [key]: value }; }
+    catch (err) { input(id).checked = fresh.config[key]; throw err; }
+    if (popup) await renderPopup();
+  }); };
+}
+toggleSetting('global-enabled', 'enabled');
+if (!popup) toggleSetting('close-duplicates', 'closeDuplicates');
 if (popup) {
   $('new-rule').onclick = () => { void openEditor(sourceId); };
   $('manage').onclick = () => { void openEditor(); };

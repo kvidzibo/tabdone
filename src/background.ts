@@ -1,4 +1,4 @@
-import { defaults, groupUrl, hostPermission, inGroup, matchesPattern, validateRule, type Rule, type Settings } from './core';
+import { defaults, groupUrl, hostPermission, inGroup, matchesPattern, pageUrl, validateRule, type Rule, type Settings } from './core';
 
 type Observation = { url: string; ruleIds: string[]; armedRuleIds: string[]; documentId: string };
 type Pending = { url: string; ruleId: string; sourceId: number; base: string };
@@ -13,8 +13,8 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
 async function settings(): Promise<Settings> {
   const value = (await chrome.storage.local.get('settings')).settings as Settings | undefined;
   if (!value) return defaults;
-  try { return { enabled: value.enabled === true, rules: value.rules.map(validateRule) }; }
-  catch { return { enabled: false, rules: [] }; }
+  try { return { enabled: value.enabled === true, closeDuplicates: value.closeDuplicates !== false, rules: value.rules.map(validateRule) }; }
+  catch { return { enabled: false, closeDuplicates: false, rules: [] }; }
 }
 async function session(): Promise<Session> {
   return (await chrome.storage.session.get('state')).state as Session || emptySession();
@@ -97,6 +97,27 @@ async function closePending(state: Session, config: Settings) {
     catch { /* The tab may already have closed. */ }
   }
 }
+// Edits are detectable only where TabDone's page script already runs.
+async function edited(tabId: number, url: string) {
+  try { return (await chrome.tabs.sendMessage(tabId, { type: 'inspect', expectedUrl: url }, { frameId: 0 }))?.dirty === true; }
+  catch { return false; }
+}
+// A tab that just committed a URL replaces older tabs showing exactly that URL.
+async function closeDuplicates(id: number, url: string) {
+  const config = await settings();
+  const tab = await getTab(id);
+  if (!config.enabled || !config.closeDuplicates || !tab || tab.url !== url || tab.pendingUrl) return;
+  try { pageUrl(url); } catch { return; }
+  const state = await session();
+  const duplicate = (t?: chrome.tabs.Tab) => Boolean(t?.id && t.id !== id && t.url === url && t.incognito === tab.incognito &&
+    !t.active && !t.pinned && !t.pendingUrl && !state.picking[t.id]);
+  for (const candidate of await chrome.tabs.query({})) {
+    if (!duplicate(candidate) || await edited(candidate.id!, url)) continue;
+    const source = await getTab(id);
+    if (!source || source.url !== url || source.pendingUrl || !duplicate(await getTab(candidate.id!))) continue;
+    try { await chrome.tabs.remove(candidate.id!); } catch { /* Already closed. */ }
+  }
+}
 async function badges(state: Session, config: Settings) {
   const tabs = await chrome.tabs.query({});
   for (const tab of tabs) {
@@ -175,7 +196,7 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
     return { config: await settings(), state, tab, tabs: await chrome.tabs.query({}) };
   }
   if (msg.type === 'saveSettings') {
-    const config: Settings = { enabled: msg.config.enabled === true, rules: msg.config.rules.map(validateRule) };
+    const config: Settings = { enabled: msg.config.enabled === true, closeDuplicates: msg.config.closeDuplicates !== false, rules: msg.config.rules.map(validateRule) };
     if (config.rules.length > 100 || new Set(config.rules.map(r => r.id)).size !== config.rules.length) throw new Error('Use at most 100 rules with unique IDs.');
     for (const rule of config.rules) if (config.enabled && rule.enabled && !await allowed(rule)) throw new Error('Grant site access before enabling this rule.');
     await chrome.storage.local.set({ settings: config });
@@ -228,6 +249,7 @@ chrome.tabs.onUpdated.addListener((id, change) => {
       for (const [key, p] of Object.entries(state.pending)) if (p.sourceId === id) delete state.pending[key];
       await save(state);
     }
+    if (change.url) await closeDuplicates(id, change.url);
     if (change.status === 'complete') {
       // document_idle can run before slow subresources finish. Reannounce after
       // the loading guard lifts, even if the DOM's completion state is unchanged.
