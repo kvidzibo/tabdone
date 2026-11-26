@@ -1,4 +1,4 @@
-import { defaults, groupUrl, hostPermission, inGroup, matchesPattern, normalizedText, pageUrl, pathSegments, validateRule, type Rule, type Settings } from './core';
+import { defaults, groupUrl, hostPermission, inGroup, matchesPattern, normalizedText, pageUrl, pathSegments, validateRule, type Rule, type RuleType, type Settings } from './core';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => $<HTMLInputElement>(id);
 const popup = document.body.classList.contains('popup');
@@ -28,7 +28,7 @@ async function access(pattern: string) {
 function card(rule: Rule, onClick: () => void) {
   const button = document.createElement('button'); button.className = 'rule-card';
   const name = document.createElement('strong'); name.textContent = rule.name;
-  const detail = document.createElement('small'); detail.textContent = `${rule.enabled ? '' : 'Paused · '}${new URL(rule.pattern).host} · ${rule.text || '(empty text)'}`;
+  const detail = document.createElement('small'); detail.textContent = `${rule.enabled ? '' : 'Paused · '}${new URL(rule.pattern).host} · ${rule.type === 'keepDuplicates' ? 'Keeps duplicates open' : rule.text || '(empty text)'}`;
   button.append(name, detail); button.onclick = onClick; return button;
 }
 async function openEditor(tabId?: number, ruleId?: string) {
@@ -40,21 +40,28 @@ async function renderPopup() {
   const status = await send({ type: 'status' }); config = status.config; input('global-enabled').checked = config.enabled;
   const tab = status.tab as chrome.tabs.Tab | undefined;
   sourceId = tab?.id; sourceUrl = tab?.url || '';
-  const rules = config.rules.filter(r => r.enabled && matchesPattern(r.pattern, sourceUrl));
+  const matching = config.rules.filter(r => r.enabled && matchesPattern(r.pattern, sourceUrl));
+  const rules = matching.filter(r => r.type === 'close');
   const ready = Boolean(status.state.pending[sourceId!]) || rules.some(r => Object.entries(status.state.observations).some(([id, value]) => {
     const o = value as { ruleIds: string[]; url: string };
     return o.ruleIds.includes(r.id) && (r.closeRelated ? groupUrl(o.url, r.baseDepth) === groupUrl(sourceUrl, r.baseDepth) : Number(id) === sourceId);
   }));
   const granted = rules.length > 0 && await chrome.permissions.contains({ origins: [hostPermission(rules[0].pattern)] });
-  $('page-status').textContent = !config.enabled ? 'Paused — nothing will close' : !rules.length ? 'No matching rule' : !granted ? 'Site access needed — edit the rule' : ready ? '● Done — closes when you leave' : 'Watching for completion';
+  $('page-status').textContent = !config.enabled ? 'Paused — nothing will close' : !rules.length ? (matching.length ? 'Duplicates of this page stay open' : 'No matching rule') : !granted ? 'Site access needed — edit the rule' : ready ? '● Done — closes after you switch tabs and leave the browser' : 'Watching for completion';
   const rule = rules[0], base = rule ? groupUrl(sourceUrl, rule.baseDepth) : null;
   const count = base && rule.closeRelated ? status.tabs.filter((t: chrome.tabs.Tab) => t.url && inGroup(t.url, base)).length : rule ? 1 : 0;
   $('count').textContent = count ? `${count} matching tab${count === 1 ? '' : 's'} · pinned tabs stay open` : 'Choose an element that means this page is done.';
-  $('popup-rules').replaceChildren(...rules.map(r => card(r, () => { void openEditor(sourceId, r.id); })));
+  $('popup-rules').replaceChildren(...matching.map(r => card(r, () => { void openEditor(sourceId, r.id); })));
   try { pageUrl(sourceUrl); input('new-rule').disabled = false; } catch { input('new-rule').disabled = true; }
 }
+const ruleType = () => $<HTMLSelectElement>('rule-type').value as RuleType;
+function applyType() {
+  const keep = ruleType() === 'keepDuplicates';
+  // Hidden required fields would block submitting a keep-duplicates rule.
+  $('completion-fields').hidden = keep; $('keep-hint').hidden = !keep; input('selector').required = !keep;
+}
 function readRule(): Rule {
-  return validateRule({ id: editingId || crypto.randomUUID(), name: input('name').value, pattern: input('pattern').value.trim(), selector: input('selector').value.trim(), text: input('text').value, baseDepth: Number(input('scope').value), closeRelated: input('related').checked, enabled: input('rule-enabled').checked });
+  return validateRule({ id: editingId || crypto.randomUUID(), type: ruleType(), name: input('name').value, pattern: input('pattern').value.trim(), selector: input('selector').value.trim(), text: input('text').value, baseDepth: Number(input('scope').value), closeRelated: input('related').checked, enabled: input('rule-enabled').checked });
 }
 function validateSelector(selector: string) {
   try { document.querySelector(selector); } catch { throw new Error('Invalid CSS selector. Pick another element or edit the selector.'); }
@@ -79,6 +86,7 @@ function preview() {
 }
 function fill(rule?: Rule) {
   editingId = rule?.id || '';
+  $<HTMLSelectElement>('rule-type').value = rule?.type || 'close'; applyType();
   input('name').value = rule?.name || '';
   input('pattern').value = rule?.pattern || (sourceUrl ? pageUrl(sourceUrl).origin + pageUrl(sourceUrl).pathname : '');
   input('selector').value = rule?.selector || ''; input('text').value = rule?.text || '';
@@ -95,7 +103,7 @@ function renderRules() {
   if (!config.rules.length) { const p = document.createElement('p'); p.className = 'muted small'; p.textContent = 'No rules yet. Start on a website using the toolbar button.'; container.append(p); }
 }
 async function storeDraft() {
-  await chrome.storage.session.set({ [draftKey()]: { editingId, sourceUrl, name: input('name').value, pattern: input('pattern').value, selector: input('selector').value, text: input('text').value, depth: Number(input('scope').value), related: input('related').checked, enabled: input('rule-enabled').checked } });
+  await chrome.storage.session.set({ [draftKey()]: { editingId, sourceUrl, type: ruleType(), name: input('name').value, pattern: input('pattern').value, selector: input('selector').value, text: input('text').value, depth: Number(input('scope').value), related: input('related').checked, enabled: input('rule-enabled').checked } });
 }
 async function receivePick() {
   const status = await send({ type: 'status', tabId: sourceId });
@@ -120,6 +128,7 @@ async function initEditor() {
   fill(requested);
   if (!requested && draft && draft.sourceUrl === sourceUrl) {
     editingId = draft.editingId;
+    $<HTMLSelectElement>('rule-type').value = draft.type || 'close'; applyType();
     for (const key of ['name', 'pattern', 'selector', 'text']) input(key).value = draft[key];
     input('related').checked = draft.related; input('rule-enabled').checked = draft.enabled; renderScopes(draft.depth);
     $('delete').hidden = !editingId; renderRules();
@@ -127,6 +136,7 @@ async function initEditor() {
   await receivePick();
   $('rule-form').addEventListener('input', () => { void storeDraft(); });
   $('related').addEventListener('change', preview); $('scope').addEventListener('change', preview);
+  $('rule-type').addEventListener('change', applyType);
   $('blank-rule').onclick = () => { fill(); void storeDraft(); if (!sourceId) error('Open a website and use the toolbar’s “New rule for this page” to start.'); };
   $('pick').onclick = () => { void run(async () => {
     // Request from this click, before awaiting other work, to preserve user activation.
@@ -141,14 +151,15 @@ async function initEditor() {
     $('test-result').textContent = `${result.count} visible text match${result.count === 1 ? '' : 'es'} — ${result.matches ? 'completion detected' : 'not done'}${result.dirty ? '; detected edits protect this page' : ''}.`;
   }); };
   $('rule-form').onsubmit = event => { event.preventDefault(); void run(async () => {
-    const rule = readRule(); validateSelector(rule.selector);
-    if (rule.enabled) await access(rule.pattern);
+    const rule = readRule();
+    if (rule.type === 'close') validateSelector(rule.selector);
+    if (rule.enabled && rule.type === 'close') await access(rule.pattern);
     const fresh = await send({ type: 'status', tabId: sourceId });
     const rules = [...fresh.config.rules.filter((r: Rule) => r.id !== rule.id), rule];
     await send({ type: 'saveSettings', config: { ...fresh.config, rules } });
     config = { ...fresh.config, rules }; fill(rule);
     await chrome.storage.session.remove(draftKey());
-    $('saved').textContent = 'Rule saved. Reload the source page if it was already open and is not being watched.';
+    $('saved').textContent = rule.type === 'close' ? 'Rule saved. Reload the source page if it was already open and is not being watched.' : 'Rule saved.';
   }); };
   $('delete').onclick = () => { void run(async () => {
     if (!confirm('Delete this rule?')) return;

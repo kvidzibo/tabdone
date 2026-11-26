@@ -35,12 +35,12 @@ async function inspect(tabId: number, rule: Rule, url: string, documentId?: stri
 async function syncScripts() {
   const config = await settings();
   const origins: string[] = [];
-  for (const rule of config.rules) if (config.enabled && rule.enabled && await allowed(rule)) origins.push(hostPermission(rule.pattern));
+  for (const rule of config.rules) if (config.enabled && rule.enabled && rule.type === 'close' && await allowed(rule)) origins.push(hostPermission(rule.pattern));
   await chrome.scripting.unregisterContentScripts();
   if (origins.length) {
     await chrome.scripting.registerContentScripts([{ id: 'tabdone-watch', matches: [...new Set(origins)], js: ['content.js'], runAt: 'document_idle', allFrames: false, persistAcrossSessions: true }]);
     for (const tab of await chrome.tabs.query({})) {
-      if (tab.id && tab.url && config.rules.some(r => origins.includes(hostPermission(r.pattern)) && new URL(r.pattern.replace(/\*/g, '')).origin === new URL(tab.url!).origin)) {
+      if (tab.id && tab.url && config.rules.some(r => r.type === 'close' && origins.includes(hostPermission(r.pattern)) && new URL(r.pattern.replace(/\*/g, '')).origin === new URL(tab.url!).origin)) {
         try { await inject(tab.id); } catch { /* Restricted or discarded page: leave open. */ }
       }
     }
@@ -56,11 +56,11 @@ async function arm(state: Session, config: Settings) {
       delete state.observations[key];
       continue;
     }
-    // Active tabs in ANY window stay open; switching apps never triggers closure.
+    // Selected tabs in every window stay open, even while the browser is unfocused.
     if (source.active || state.picking[key]) continue;
     for (const ruleId of observation.ruleIds) {
       if (observation.armedRuleIds.includes(ruleId)) continue;
-      const rule = config.rules.find(r => r.id === ruleId && r.enabled);
+      const rule = config.rules.find(r => r.id === ruleId && r.enabled && r.type === 'close');
       if (!rule || !matchesPattern(rule.pattern, source.url!) || !await allowed(rule)) continue;
       const proof = await inspect(sourceId, rule, observation.url, observation.documentId);
       if (!proof || proof.error || proof.url !== observation.url || !proof.matches || proof.dirty) continue;
@@ -76,10 +76,15 @@ async function arm(state: Session, config: Settings) {
     }
   }
 }
+// windows.getAll sees only this profile's windows (and incognito ones only with access).
+async function unfocused() {
+  const windows = await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'panel', 'app', 'devtools'] });
+  return !windows.some(w => w.focused);
+}
 async function closePending(state: Session, config: Settings) {
   for (const [key, pending] of Object.entries(state.pending)) {
     const id = Number(key);
-    const rule = config.rules.find(r => r.id === pending.ruleId && r.enabled);
+    const rule = config.rules.find(r => r.id === pending.ruleId && r.enabled && r.type === 'close');
     let tab = await getTab(id);
     if (!rule || !tab || tab.url !== pending.url || tab.pendingUrl || tab.status === 'loading' || !inGroup(tab.url, pending.base) || !await allowed(rule)) {
       delete state.pending[key];
@@ -93,6 +98,8 @@ async function closePending(state: Session, config: Settings) {
     const latest = await settings();
     if (!latest.enabled || !latest.rules.some(r => JSON.stringify(r) === JSON.stringify(rule)) || !await allowed(rule)) continue;
     if (!tab || tab.active || tab.pinned || tab.pendingUrl || tab.status === 'loading' || tab.url !== pending.url) continue;
+    // Stop if you return to the browser mid-sweep; the next sweep resumes.
+    if (!await unfocused()) return;
     try { await chrome.tabs.remove(id); delete state.pending[key]; delete state.observations[key]; }
     catch { /* The tab may already have closed. */ }
   }
@@ -102,23 +109,32 @@ async function edited(tabId: number, url: string) {
   try { return (await chrome.tabs.sendMessage(tabId, { type: 'inspect', expectedUrl: url }, { frameId: 0 }))?.dirty === true; }
   catch { return false; }
 }
-// URL commit order, recorded as events arrive: queued handlers can run after later commits.
-const commits = new Map<number, number>();
-let commitCount = 0;
-// A tab that just committed a URL replaces older tabs showing exactly that URL.
-async function closeDuplicates(id: number, url: string, order: number) {
-  const config = await settings();
-  const tab = await getTab(id);
-  if (!config.enabled || !config.closeDuplicates || !tab || tab.url !== url || tab.pendingUrl) return;
-  try { pageUrl(url); } catch { return; }
-  const state = await session();
-  const duplicate = (t?: chrome.tabs.Tab) => Boolean(t?.id && t.id !== id && t.url === url && t.incognito === tab.incognito &&
-    (commits.get(t.id) ?? 0) < order && !t.active && !t.pinned && !t.pendingUrl && !state.picking[t.id]);
-  for (const candidate of await chrome.tabs.query({})) {
-    if (!duplicate(candidate) || await edited(candidate.id!, url)) continue;
-    const source = await getTab(id);
-    if (!source || source.url !== url || source.pendingUrl || !duplicate(await getTab(candidate.id!))) continue;
-    try { await chrome.tabs.remove(candidate.id!); } catch { /* Already closed. */ }
+// Among tabs showing exactly the same URL, keep a selected/pinned/picking copy,
+// otherwise the most recently used one; close the rest unless edited.
+async function closeDuplicates(state: Session, config: Settings) {
+  if (!config.closeDuplicates) return;
+  const keep = config.rules.filter(r => r.enabled && r.type === 'keepDuplicates');
+  const groups = new Map<string, chrome.tabs.Tab[]>();
+  for (const tab of await chrome.tabs.query({})) {
+    if (!tab.id || !tab.url || tab.pendingUrl) continue;
+    try { pageUrl(tab.url); } catch { continue; }
+    if (keep.some(r => matchesPattern(r.pattern, tab.url!))) continue;
+    const key = `${tab.incognito}|${tab.url}`;
+    groups.set(key, [...groups.get(key) ?? [], tab]);
+  }
+  const held = (t: chrome.tabs.Tab) => t.active || t.pinned || Boolean(state.picking[t.id!]);
+  for (const tabs of groups.values()) {
+    if (tabs.length < 2) continue;
+    tabs.sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0) || b.id! - a.id!);
+    const keeper = tabs.find(held) ?? tabs[0];
+    for (const tab of tabs) {
+      if (tab === keeper || held(tab) || await edited(tab.id!, tab.url!)) continue;
+      const latest = await getTab(tab.id!), kept = await getTab(keeper.id!), now = await settings();
+      if (!now.enabled || !now.closeDuplicates || !latest || latest.url !== tab.url || latest.pendingUrl || held(latest) ||
+        !kept || kept.url !== tab.url || kept.pendingUrl) continue;
+      if (!await unfocused()) return;
+      try { await chrome.tabs.remove(tab.id!); } catch { /* Already closed. */ }
+    }
   }
 }
 async function badges(state: Session, config: Settings) {
@@ -128,7 +144,8 @@ async function badges(state: Session, config: Settings) {
     let text = '', color = '#64748b', title = 'TabDone — no matching rule';
     if (!config.enabled) { text = 'Ⅱ'; title = 'TabDone — paused'; }
     else if (tab.url) {
-      const rule = config.rules.find(r => r.enabled && matchesPattern(r.pattern, tab.url!));
+      const rule = config.rules.find(r => r.enabled && r.type === 'close' && matchesPattern(r.pattern, tab.url!));
+      if (!rule && config.rules.some(r => r.enabled && matchesPattern(r.pattern, tab.url!))) title = 'TabDone — duplicates of this page stay open';
       if (rule && await allowed(rule)) {
         const base = groupUrl(tab.url, rule.baseDepth);
         if (base) {
@@ -146,13 +163,30 @@ async function badges(state: Session, config: Settings) {
     } catch { /* Tab closed during update. */ }
   }
 }
-async function reconcile() {
+// Updates badges and drops state while paused; never closes tabs.
+async function refresh() {
   const config = await settings();
   const state = await session();
-  if (config.enabled) { await arm(state, config); await closePending(state, config); }
+  if (!config.enabled) { state.observations = {}; state.pending = {}; await save(state); }
+  await badges(state, config);
+}
+// All closing happens here, only while no browser window has focus.
+async function sweep() {
+  const config = await settings();
+  const state = await session();
+  if (config.enabled) { await arm(state, config); await closePending(state, config); await closeDuplicates(state, config); }
   else { state.observations = {}; state.pending = {}; }
   await save(state);
   await badges(state, config);
+}
+// Some Linux window managers briefly report no focus between two browser windows,
+// so focus loss must last 500 ms without any reported focus gain, whichever trigger noticed it.
+let focusGains = 0;
+async function sweepIfUnfocused() {
+  const gains = focusGains;
+  if (!await unfocused()) return;
+  await new Promise(resolve => setTimeout(resolve, 500));
+  if (gains === focusGains && await unfocused()) await sweep();
 }
 function trustedUI(sender: chrome.runtime.MessageSender) {
   return sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));
@@ -167,7 +201,7 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
       const config = await settings();
       const ids: string[] = [];
       if (config.enabled && !msg.dirty && !state.picking[id] && Array.isArray(msg.readyRuleIds)) {
-        for (const rule of config.rules) if (rule.enabled && msg.readyRuleIds.includes(rule.id) && matchesPattern(rule.pattern, msg.url) && await allowed(rule)) ids.push(rule.id);
+        for (const rule of config.rules) if (rule.enabled && rule.type === 'close' && msg.readyRuleIds.includes(rule.id) && matchesPattern(rule.pattern, msg.url) && await allowed(rule)) ids.push(rule.id);
       }
       const previous = state.observations[id];
       if (ids.length && sender.documentId) {
@@ -176,7 +210,7 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
         state.observations[id] = { url: msg.url, ruleIds: ids, armedRuleIds, documentId: sender.documentId };
       } else delete state.observations[id];
       for (const [key, p] of Object.entries(state.pending)) if (p.sourceId === id && !ids.includes(p.ruleId)) delete state.pending[key];
-      await save(state); await reconcile();
+      await save(state); await refresh();
       return { ok: true };
     }
     if (msg.type === 'picked' && state.picking[id] && typeof msg.selector === 'string' && typeof msg.text === 'string' && msg.selector.length <= 2000 && msg.text.length <= 2000) {
@@ -202,12 +236,12 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
     // Only setCloseDuplicates changes that preference; UI snapshots here can be stale.
     const config: Settings = { enabled: msg.config.enabled === true, closeDuplicates: (await settings()).closeDuplicates, rules: msg.config.rules.map(validateRule) };
     if (config.rules.length > 100 || new Set(config.rules.map(r => r.id)).size !== config.rules.length) throw new Error('Use at most 100 rules with unique IDs.');
-    for (const rule of config.rules) if (config.enabled && rule.enabled && !await allowed(rule)) throw new Error('Grant site access before enabling this rule.');
+    for (const rule of config.rules) if (config.enabled && rule.enabled && rule.type === 'close' && !await allowed(rule)) throw new Error('Grant site access before enabling this rule.');
     await chrome.storage.local.set({ settings: config });
     for (const id of Object.keys(state.picking)) {
       try { await chrome.tabs.sendMessage(Number(id), { type: 'endPick' }, { frameId: 0 }); } catch { /* Closed tab. */ }
     }
-    await save(emptySession()); await syncScripts(); await reconcile();
+    await save(emptySession()); await syncScripts(); await refresh();
     return { ok: true };
   }
   if (msg.type === 'setCloseDuplicates') {
@@ -248,20 +282,24 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
   serial(() => message(msg, sender)).then(respond, error => respond({ error: String(error.message || error) }));
   return true;
 });
-chrome.runtime.onInstalled.addListener(() => { void serial(async () => { await syncScripts(); await reconcile(); }); });
-chrome.runtime.onStartup.addListener(() => { void serial(async () => { await save(emptySession()); await syncScripts(); await reconcile(); }); });
-chrome.tabs.onActivated.addListener(() => { void serial(reconcile); });
+chrome.runtime.onInstalled.addListener(() => { void serial(async () => { await syncScripts(); await refresh(); }); });
+chrome.runtime.onStartup.addListener(() => { void serial(async () => { await save(emptySession()); await syncScripts(); await refresh(); }); });
+// Chromium on Linux/X11 never reports focus moving to another app, so also poll.
+const sweepAlarm = 'sweep';
+void chrome.alarms.get(sweepAlarm).then(alarm => { if (!alarm) void chrome.alarms.create(sweepAlarm, { periodInMinutes: 0.5 }); });
+chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === sweepAlarm) void serial(sweepIfUnfocused); });
+chrome.windows.onFocusChanged.addListener(id => {
+  if (id === chrome.windows.WINDOW_ID_NONE) void serial(sweepIfUnfocused);
+  else focusGains++;
+});
 chrome.tabs.onCreated.addListener(() => { void serial(async () => badges(await session(), await settings())); });
 chrome.tabs.onUpdated.addListener((id, change) => {
-  let order = 0;
-  if (change.url) commits.set(id, order = ++commitCount);
   void serial(async () => {
     if (change.url || change.status === 'loading') {
       const state = await session(); delete state.observations[id]; delete state.pending[id]; delete state.picking[id];
       for (const [key, p] of Object.entries(state.pending)) if (p.sourceId === id) delete state.pending[key];
       await save(state);
     }
-    if (change.url) await closeDuplicates(id, change.url, order);
     if (change.status === 'complete') {
       // document_idle can run before slow subresources finish. Reannounce after
       // the loading guard lifts, even if the DOM's completion state is unchanged.
@@ -269,20 +307,19 @@ chrome.tabs.onUpdated.addListener((id, change) => {
       const tab = await getTab(id);
       if (config.enabled && tab?.url) {
         for (const rule of config.rules) {
-          if (rule.enabled && matchesPattern(rule.pattern, tab.url) && await allowed(rule)) {
+          if (rule.enabled && rule.type === 'close' && matchesPattern(rule.pattern, tab.url) && await allowed(rule)) {
             try { await inject(id); } catch { /* Restricted/discarded page: leave open. */ }
             break;
           }
         }
       }
     }
-    if (change.status === 'complete' || change.url || change.pinned !== undefined) await reconcile();
+    if (change.status === 'complete' || change.url || change.pinned !== undefined) await refresh();
   });
 });
 chrome.tabs.onRemoved.addListener(id => {
-  commits.delete(id);
-  void serial(async () => { const state = await session(); delete state.observations[id]; delete state.pending[id]; delete state.picking[id]; await save(state); await reconcile(); });
+  void serial(async () => { const state = await session(); delete state.observations[id]; delete state.pending[id]; delete state.picking[id]; await save(state); await refresh(); });
 });
 chrome.permissions.onRemoved.addListener(() => {
-  void serial(async () => { await save(emptySession()); await syncScripts(); await reconcile(); });
+  void serial(async () => { await save(emptySession()); await syncScripts(); await refresh(); });
 });

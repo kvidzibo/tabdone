@@ -1,15 +1,17 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TabDone — Rules</title><link rel="stylesheet" href="style.css"><script type="module" src="ui.js"></script></head>
-<body><div class="app"><header><div><h1><img src="icons/32.png" alt="">TabDone</h1><p class="muted">Finish a page. Leave the tab. Clear the clutter.</p></div><label class="switch"><input id="global-enabled" type="checkbox" aria-label="Enable TabDone"><span></span></label></header>
+<body><div class="app"><header><div><h1><img src="icons/32.png" alt="">TabDone</h1><p class="muted">Finish a page. Leave the browser. Clear the clutter.</p></div><label class="switch"><input id="global-enabled" type="checkbox" aria-label="Enable TabDone"><span></span></label></header>
 <main class="layout"><aside><div class="section-heading"><h2>Rules</h2><button id="blank-rule" title="New rule">+ New</button></div><div id="rule-list"></div>
 <div class="section-heading settings-heading"><h2>Settings</h2></div>
-<label class="checkbox"><input id="close-duplicates" type="checkbox" checked>Close older duplicate tabs</label>
-<p class="hint">When a tab opens a page that is already open, the older tab closes. URLs must match exactly, including query and fragment.</p>
+<label class="checkbox"><input id="close-duplicates" type="checkbox" checked>Close duplicate tabs</label>
+<p class="hint">When you leave the browser, tabs showing exactly the same URL, including query and fragment, close. The selected or most recently used copy stays. Add a “Keep duplicates open” rule to exclude pages.</p>
 <p class="muted small">Everything stays on this device.</p></aside>
 <section class="panel"><h2 id="editor-title">New rule</h2><form id="rule-form">
+<label for="rule-type">Rule type</label><select id="rule-type"><option value="close">Close when done</option><option value="keepDuplicates">Keep duplicates open</option></select>
 <label for="name">Rule name</label><input id="name" maxlength="100" required placeholder="Merged PRs">
-<label for="pattern">Watch pages matching</label><input id="pattern" required spellcheck="false" placeholder="https://github.com/**/pull/**">
+<label for="pattern">Pages matching</label><input id="pattern" required spellcheck="false" placeholder="https://github.com/**/pull/**">
 <p class="hint">Exact site. * matches within a path segment; ** crosses segments. Query and fragment are ignored.</p>
+<div id="completion-fields">
 <div class="section-heading"><label for="selector">The page is done when this appears</label><button id="pick" type="button">Pick element…</button></div>
 <p id="source-page" class="hint"></p>
 <label for="selector" class="small muted">CSS selector</label><textarea id="selector" rows="2" required spellcheck="false" placeholder="Select a completion element on the page"></textarea>
@@ -20,9 +22,11 @@
 <label for="scope">Close scope</label><select id="scope"></select>
 <p id="scope-preview" class="hint"></p>
 <p class="hint">The selected path depth applies to every matching page—not just this example URL. Choose a parent only if all its subpages belong together.</p>
-<label class="checkbox"><input id="rule-enabled" type="checkbox" checked>Enable this rule</label>
-<div class="notice">Pinned tabs, active tabs in every window, and pages with detected edits stay open. Switching apps does not close tabs.</div>
+<div class="notice">Tabs close only after you leave the browser for another app. Pinned tabs, selected tabs in every window, and pages with detected edits stay open.</div>
 <p class="hint">Site access is requested when picking, testing, or enabling a rule.</p>
+</div>
+<p id="keep-hint" class="hint" hidden>Matching pages are never closed as duplicates. No site access is needed.</p>
+<label class="checkbox"><input id="rule-enabled" type="checkbox" checked>Enable this rule</label>
 <footer><button id="delete" type="button" class="danger" hidden>Delete</button><button id="cancel" type="button">Cancel</button><button type="submit" class="primary">Save rule</button></footer>
 </form><p id="error" role="alert"></p><p id="saved" role="status"></p></section></main>
-<footer class="page-footer">TabDone 0.2.1 · No accounts, telemetry, or remote code.</footer></div></body></html>
+<footer class="page-footer">TabDone 0.3.0 · No accounts, telemetry, or remote code.</footer></div></body></html>

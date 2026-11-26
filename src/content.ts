@@ -35,7 +35,8 @@ function start(): void {
       return { enabled: false, rules: [] };
     const rules: Rule[] = [];
     for (const rule of candidate.rules) {
-      try { rules.push(validateRule(rule)); } catch { /* Invalid stored rules never complete. */ }
+      try { const valid = validateRule(rule); if (valid.type === "close") rules.push(valid); }
+      catch { /* Invalid stored rules never complete. */ }
     }
     return { enabled: candidate.enabled, rules };
   }

@@ -9,8 +9,8 @@ advertising, remote code, or backend service.
 
 ## Data used and why
 
-- **Open tabs:** Tab URLs and tab state, such as selection, loading and pinning,
-  are used to match rules, group related tabs, find exact duplicate tabs, show
+- **Open tabs:** Tab URLs and tab state, such as selection, last use, loading,
+  pinning and whether a browser window has focus, are used to match rules, group related tabs, find exact duplicate tabs, show
   status and decide which tabs may close. Temporary URLs can include query strings and fragments even though
   rule matching and grouping ignore them. TabDone does not use Chrome's browsing
   history API.
