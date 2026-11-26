@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="800" viewBox="0 0 1160 800">
+  <defs>
+    <style>
+      text { font-family: Inter, 'DejaVu Sans', sans-serif; fill: #e9edf5; }
+      .muted { fill: #9aa7bd; }
+      .label { font-size: 13px; font-weight: 600; }
+      .small { font-size: 12px; }
+      .body { font-size: 14px; }
+      .mono { font-family: 'DejaVu Sans Mono', monospace; font-size: 12px; }
+    </style>
+  </defs>
+  <rect width="1160" height="800" fill="#0c1019"/>
+  <text x="48" y="54" font-size="25" font-weight="700">Auto-close</text>
+  <text x="48" y="81" class="body muted">Finish a page. Leave the tab. Clear the clutter.</text>
+  <text x="1112" y="54" text-anchor="end" class="small muted">EXTENSION UI / DRAFT 01</text>
+
+  <text x="48" y="126" class="label muted">TOOLBAR POPUP</text>
+  <rect x="48" y="146" width="304" height="388" rx="16" fill="#151c29"/>
+  <text x="70" y="181" font-size="17" font-weight="700">Auto-close</text>
+  <rect x="285" y="162" width="44" height="25" rx="12.5" fill="#a999ff"/>
+  <circle cx="316" cy="174.5" r="8.5" fill="#171329"/>
+  <rect x="70" y="204" width="260" height="1" fill="#2b3547"/>
+  <text x="70" y="233" class="small muted">ON THIS PAGE</text>
+  <circle cx="76" cy="258" r="4" fill="#a999ff"/>
+  <text x="88" y="263" class="body">Done — closes when you leave</text>
+  <text x="70" y="287" class="small muted">3 tabs match · pinned tabs stay open</text>
+
+  <text x="70" y="326" class="small muted">RULES</text>
+  <rect x="70" y="341" width="260" height="72" rx="9" fill="#202a3b"/>
+  <text x="84" y="367" class="body" font-weight="600">Merged PRs</text>
+  <text x="84" y="391" class="small muted">github.com · Merged badge</text>
+  <path d="M309 369 L316 376 L309 383 L307 381 L312 376 L307 371 Z" fill="#9aa7bd"/>
+  <rect x="70" y="431" width="260" height="40" rx="8" fill="#a999ff"/>
+  <text x="200" y="457" text-anchor="middle" font-size="14" font-weight="700" style="fill:#171329">+ New rule for this page</text>
+  <text x="200" y="508" text-anchor="middle" class="small muted">Manage rules</text>
+  <text x="48" y="565" class="small muted">One switch to pause. One click to add a rule.</text>
+
+  <text x="396" y="126" class="label muted">RULE EDITOR</text>
+  <rect x="396" y="146" width="716" height="606" rx="16" fill="#151c29"/>
+  <text x="424" y="183" font-size="19" font-weight="700">Merged PRs</text>
+  <text x="1084" y="182" text-anchor="end" class="small muted">EDIT RULE</text>
+  <rect x="424" y="204" width="660" height="1" fill="#2b3547"/>
+
+  <text x="424" y="234" class="label">Watch pages matching</text>
+  <rect x="424" y="247" width="660" height="43" rx="7" fill="#0f1520" stroke="#354158"/>
+  <text x="438" y="274" class="mono">https://github.com/**/pull/**</text>
+  <text x="424" y="311" class="small muted">Site access is requested when you enable the rule.</text>
+
+  <text x="424" y="347" class="label">The page is done when this appears</text>
+  <rect x="424" y="360" width="660" height="99" rx="9" fill="#202a3b"/>
+  <rect x="440" y="376" width="97" height="30" rx="15" fill="#8957e5"/>
+  <text x="488.5" y="396" text-anchor="middle" class="small" font-weight="600" style="fill:#fff">Merged</text>
+  <text x="551" y="395" class="body">Visible · text equals “Merged”</text>
+  <rect x="919" y="374" width="149" height="34" rx="7" fill="#303d54"/>
+  <text x="993.5" y="396" text-anchor="middle" class="small" font-weight="600">Pick element…</text>
+  <circle cx="446" cy="435" r="4" fill="#7dd4ac"/>
+  <text x="459" y="440" class="small" style="fill:#7dd4ac">1 match on this page</text>
+  <text x="1068" y="440" text-anchor="end" class="small muted">Edit selector</text>
+
+  <text x="424" y="493" class="label">When you leave the tab</text>
+  <rect x="424" y="507" width="17" height="17" rx="4" fill="#a999ff"/>
+  <path d="M427 515 L430 518 L437 511 L439 513 L430 522 L425 517 Z" fill="#171329"/>
+  <text x="452" y="521" class="body">Also close tabs at the same URL and its subpages</text>
+
+  <rect x="424" y="540" width="660" height="90" rx="8" fill="#0f1520"/>
+  <text x="440" y="561" class="small muted">CLOSE SCOPE · PREVIEW FOR THIS PAGE</text>
+  <text x="440" y="586" class="mono">github.com/kvidzibo/pinote/pull/118</text>
+  <text x="440" y="610" class="small muted">+ /commits, /changes, … · 3 matching tabs</text>
+  <text x="1068" y="586" text-anchor="end" class="small" style="fill:#b9acff">Adjust</text>
+  <text x="424" y="653" class="small muted">Pinned tabs stay open. Switching apps does not trigger closing.</text>
+
+  <rect x="424" y="676" width="660" height="1" fill="#2b3547"/>
+  <text x="424" y="714" class="small muted">Advanced options</text>
+  <text x="906" y="714" text-anchor="middle" class="body muted">Cancel</text>
+  <rect x="962" y="689" width="122" height="40" rx="8" fill="#a999ff"/>
+  <text x="1023" y="714" text-anchor="middle" class="body" font-weight="700" style="fill:#171329">Save rule</text>
+  <text x="396" y="780" class="small muted">Pick element: highlight on hover → click to select → Escape to cancel.</text>
+</svg>

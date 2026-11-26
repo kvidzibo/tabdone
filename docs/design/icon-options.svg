@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390">
+<defs>
+<style>text{font-family:Inter,'DejaVu Sans',sans-serif;fill:#edf0fa}.muted{fill:#9ca8bd}</style>
+<linearGradient id="purple" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#6d4ade"/></linearGradient>
+<symbol id="stack" viewBox="0 0 32 32">
+<path fill="#e7dcff" opacity=".6" d="M9 5H25Q28 5 28 8V22H25V9Q25 8 24 8H9Z"/>
+<path fill="#fff" fill-rule="evenodd" d="M6 10H21Q24 10 24 13V25Q24 28 21 28H6Q3 28 3 25V13Q3 10 6 10ZM6 13V25H21V17H6ZM6 13V15H21V13Z"/>
+<path fill="#fff" d="M10 18L13.5 21.5L17 18L18.5 19.5L15 23L18.5 26.5L17 28L13.5 24.5L10 28L8.5 26.5L12 23L8.5 19.5Z" transform="translate(3.375 4.4) scale(.75)"/>
+</symbol>
+<symbol id="spark" viewBox="0 0 32 32">
+<path fill="#fff" fill-rule="evenodd" d="M6 7H19V10H6V14H19V17H6V25H25V20H28V25Q28 28 25 28H6Q3 28 3 25V10Q3 7 6 7Z"/>
+<path fill="#fff" d="M25 2L27.2 8.8L34 11L27.2 13.2L25 20L22.8 13.2L16 11L22.8 8.8Z" transform="translate(1 1) scale(.9)"/>
+</symbol>
+<symbol id="done" viewBox="0 0 32 32">
+<path fill="#fff" fill-rule="evenodd" d="M6 5H26Q29 5 29 8V25Q29 28 26 28H6Q3 28 3 25V8Q3 5 6 5ZM6 8V12H26V8ZM6 15V25H26V15Z"/>
+<path fill="#fff" d="M10 19L14 23L23 14L25 16L14 27L8 21Z" transform="translate(2.5 2) scale(.8)"/>
+</symbol>
+<g id="badge"><rect width="15" height="13" rx="4" fill="#b9a6ff"/><text x="7.5" y="10" font-size="10" font-weight="700" text-anchor="middle" style="fill:#21163e">3</text></g>
+</defs>
+<rect width="960" height="390" fill="#0d111b"/>
+<text x="36" y="45" font-size="23" font-weight="700">Less file. More browser.</text>
+<text x="36" y="71" font-size="13" class="muted">Three directions · each with a live tab-count badge</text>
+<rect x="36" y="99" width="280" height="249" rx="18" fill="#201d34"/>
+<rect x="340" y="99" width="280" height="249" rx="18" fill="#181f2d"/>
+<rect x="644" y="99" width="280" height="249" rx="18" fill="#181f2d"/>
+<rect x="140" y="124" width="72" height="72" rx="20" fill="url(#purple)"/>
+<use href="#stack" x="148" y="130" width="56" height="56"/>
+<rect x="444" y="124" width="72" height="72" rx="20" fill="url(#purple)"/>
+<use href="#spark" x="452" y="132" width="56" height="56"/>
+<rect x="748" y="124" width="72" height="72" rx="20" fill="url(#purple)"/>
+<use href="#done" x="756" y="132" width="56" height="56"/>
+<text x="176" y="226" text-anchor="middle" font-size="16" font-weight="700">1. Tab stack ×</text>
+<text x="480" y="226" text-anchor="middle" font-size="16" font-weight="700">2. Tab sparkle</text>
+<text x="784" y="226" text-anchor="middle" font-size="16" font-weight="700">3. Tab done</text>
+<text x="176" y="249" text-anchor="middle" font-size="12" style="fill:#c4b5fd">My pick · close related tabs</text>
+<text x="480" y="249" text-anchor="middle" font-size="12" class="muted">Automatic cleanup</text>
+<text x="784" y="249" text-anchor="middle" font-size="12" class="muted">Finished and out of the way</text>
+<rect x="133" y="270" width="86" height="49" rx="10" fill="#101522"/>
+<rect x="437" y="270" width="86" height="49" rx="10" fill="#101522"/>
+<rect x="741" y="270" width="86" height="49" rx="10" fill="#101522"/>
+<use href="#stack" x="145" y="281" width="24" height="24"/>
+<use href="#stack" x="182" y="281" width="24" height="24"/>
+<use href="#badge" x="195" y="295"/>
+<use href="#spark" x="449" y="281" width="24" height="24"/>
+<use href="#spark" x="486" y="281" width="24" height="24"/>
+<use href="#badge" x="499" y="295"/>
+<use href="#done" x="753" y="281" width="24" height="24"/>
+<use href="#done" x="790" y="281" width="24" height="24"/>
+<use href="#badge" x="803" y="295"/>
+<text x="36" y="375" font-size="12" class="muted">Large: extension artwork. Small: toolbar previews without / with badge. Badge styling is illustrative.</text>
+</svg>

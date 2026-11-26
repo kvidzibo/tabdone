@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="370" viewBox="0 0 840 370">
+  <defs>
+    <style>text{font-family:Inter,'DejaVu Sans',sans-serif;fill:#e9edf5}.muted{fill:#9aa7bd}</style>
+    <symbol id="tab" viewBox="0 0 24 24">
+      <path fill="#e9edf5" fill-rule="evenodd" d="M5 2H13L17 6H21V22H3V4Q3 2 5 2ZM5 4V20H19V8H16L12 4Z"/>
+      <path fill="#e9edf5" d="M8 10L11 13L14 10L15.5 11.5L12.5 14.5L15.5 17.5L14 19L11 16L8 19L6.5 17.5L9.5 14.5L6.5 11.5Z"/>
+    </symbol>
+    <g id="watching"><use href="#tab" width="48" height="48"/><rect x="28" y="28" width="30" height="25" rx="6" fill="#64748b"/><text x="43" y="47" font-size="19" font-weight="700" text-anchor="middle">3</text></g>
+    <g id="ready"><use href="#tab" width="48" height="48"/><rect x="28" y="28" width="30" height="25" rx="6" fill="#8957e5"/><text x="43" y="47" font-size="19" font-weight="700" text-anchor="middle">3</text></g>
+    <g id="paused"><use href="#tab" width="48" height="48" opacity="0.45"/><rect x="28" y="28" width="30" height="25" rx="6" fill="#64748b"/><path d="M37 34H41V47H37ZM45 34H49V47H45Z" fill="#fff"/></g>
+  </defs>
+  <rect width="840" height="370" fill="#0c1019"/>
+  <text x="32" y="43" font-size="22" font-weight="700">Tab + close ×</text>
+  <text x="32" y="69" font-size="13" class="muted">Badge counts tabs in the current URL group.</text>
+
+  <rect x="32" y="95" width="180" height="210" rx="12" fill="#1b2230"/>
+  <rect x="230" y="95" width="180" height="210" rx="12" fill="#1b2230"/>
+  <rect x="428" y="95" width="180" height="210" rx="12" fill="#1b2230"/>
+  <rect x="626" y="95" width="180" height="210" rx="12" fill="#1b2230"/>
+
+  <use href="#watching" x="93" y="118"/>
+  <use href="#ready" x="291" y="118"/>
+  <use href="#tab" x="494" y="118" width="48" height="48"/>
+  <use href="#paused" x="687" y="118"/>
+
+  <text x="122" y="204" font-size="14" font-weight="600" text-anchor="middle">Watching</text>
+  <text x="320" y="204" font-size="14" font-weight="600" text-anchor="middle">Ready to close</text>
+  <text x="518" y="204" font-size="14" font-weight="600" text-anchor="middle">No matching rule</text>
+  <text x="716" y="204" font-size="14" font-weight="600" text-anchor="middle">Paused</text>
+
+  <text x="122" y="226" font-size="12" text-anchor="middle" class="muted">3 matching tabs</text>
+  <text x="320" y="226" font-size="12" text-anchor="middle" class="muted">Closes after you leave</text>
+  <text x="518" y="226" font-size="12" text-anchor="middle" class="muted">No badge</text>
+  <text x="716" y="226" font-size="12" text-anchor="middle" class="muted">Nothing will close</text>
+
+  <use href="#watching" transform="translate(107.5 255) scale(.5)"/>
+  <use href="#ready" transform="translate(305.5 255) scale(.5)"/>
+  <use href="#tab" x="506" y="255" width="24" height="24"/>
+  <use href="#paused" transform="translate(701.5 255) scale(.5)"/>
+  <text x="32" y="339" font-size="12" class="muted">Enlarged above · toolbar-size preview below. Chrome controls the exact badge shape.</text>
+</svg>
