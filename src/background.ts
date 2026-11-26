@@ -145,6 +145,7 @@ async function badges(state: Session, config: Settings) {
     if (!config.enabled) { text = 'Ⅱ'; title = 'TabDone — paused'; }
     else if (tab.url) {
       const rule = config.rules.find(r => r.enabled && r.type === 'close' && matchesPattern(r.pattern, tab.url!));
+      if (!rule && config.rules.some(r => r.enabled && matchesPattern(r.pattern, tab.url!))) title = 'TabDone — duplicates of this page stay open';
       if (rule && await allowed(rule)) {
         const base = groupUrl(tab.url, rule.baseDepth);
         if (base) {
@@ -178,7 +179,13 @@ async function sweep() {
   await save(state);
   await badges(state, config);
 }
-async function sweepIfUnfocused() { if (await unfocused()) await sweep(); }
+// Some Linux window managers briefly report no focus between two browser windows,
+// so focus loss must last 500 ms, whichever trigger noticed it.
+async function sweepIfUnfocused() {
+  if (!await unfocused()) return;
+  await new Promise(resolve => setTimeout(resolve, 500));
+  if (await unfocused()) await sweep();
+}
 function trustedUI(sender: chrome.runtime.MessageSender) {
   return sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));
 }
@@ -279,12 +286,7 @@ chrome.runtime.onStartup.addListener(() => { void serial(async () => { await sav
 const sweepAlarm = 'sweep';
 void chrome.alarms.get(sweepAlarm).then(alarm => { if (!alarm) void chrome.alarms.create(sweepAlarm, { periodInMinutes: 0.5 }); });
 chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === sweepAlarm) void serial(sweepIfUnfocused); });
-let blurTimer: ReturnType<typeof setTimeout> | undefined;
-chrome.windows.onFocusChanged.addListener(id => {
-  clearTimeout(blurTimer);
-  // Some Linux window managers briefly report no focus between two browser windows.
-  if (id === chrome.windows.WINDOW_ID_NONE) blurTimer = setTimeout(() => { void serial(sweepIfUnfocused); }, 500);
-});
+chrome.windows.onFocusChanged.addListener(id => { if (id === chrome.windows.WINDOW_ID_NONE) void serial(sweepIfUnfocused); });
 chrome.tabs.onCreated.addListener(() => { void serial(async () => badges(await session(), await settings())); });
 chrome.tabs.onUpdated.addListener((id, change) => {
   void serial(async () => {

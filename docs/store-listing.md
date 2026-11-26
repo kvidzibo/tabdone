@@ -37,8 +37,10 @@ Features:
 - Close duplicate tabs with exactly the same URL (on by default; can be turned off or limited by rules).
 - Keep pinned tabs, selected tabs in every window, and pages with detected edits open.
 
-Tabs close only after you switch to another application, never while you browse;
-on some Linux systems this can take up to 30 seconds. Selected tabs stay open.
+Tabs close only when no Chrome window TabDone can see has focus, for example after
+you switch to another application; focusing another Chrome profile or an incognito
+window without TabDone access also counts. Tabs never close while you browse. On some
+Linux systems this can take up to 30 seconds. Selected tabs stay open.
 Edit detection is conservative, not a guarantee that every site's unsaved work
 will be recognized. Test rules carefully: broad selectors or close scopes can
 close unintended tabs, and changing website markup can require rule updates.
