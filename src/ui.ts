@@ -164,17 +164,24 @@ async function initEditor() {
     if (area === 'session' && changes.state) void receivePick().catch(error);
   });
 }
-function toggleSetting(id: string, key: 'enabled' | 'closeDuplicates') {
-  input(id).onchange = () => { void run(async () => {
-    const fresh = await send({ type: 'status' });
-    const value = input(id).checked;
-    try { await send({ type: 'saveSettings', config: { ...fresh.config, [key]: value } }); config = { ...fresh.config, [key]: value }; }
-    catch (err) { input(id).checked = fresh.config[key]; throw err; }
-    if (popup) await renderPopup();
-  }); };
+function toggle(id: string, save: (checked: boolean) => Promise<void>) {
+  const box = input(id);
+  box.onchange = () => {
+    // run() ignores clicks during another save; never show an unsaved state.
+    if (busy) { box.checked = !box.checked; return; }
+    void run(async () => {
+      try { await save(box.checked); } catch (err) { box.checked = !box.checked; throw err; }
+      if (popup) await renderPopup();
+    });
+  };
 }
-toggleSetting('global-enabled', 'enabled');
-if (!popup) toggleSetting('close-duplicates', 'closeDuplicates');
+toggle('global-enabled', async enabled => {
+  const fresh = await send({ type: 'status' });
+  await send({ type: 'saveSettings', config: { ...fresh.config, enabled } }); config = { ...fresh.config, enabled };
+});
+if (!popup) toggle('close-duplicates', async value => {
+  await send({ type: 'setCloseDuplicates', value }); config = { ...config, closeDuplicates: value };
+});
 if (popup) {
   $('new-rule').onclick = () => { void openEditor(sourceId); };
   $('manage').onclick = () => { void openEditor(); };

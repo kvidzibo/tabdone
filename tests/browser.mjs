@@ -178,6 +178,14 @@ try {
   const newer = await open('/docs/page?x=1#top');
   await until(() => older.isClosed(), 'older exact duplicate closes');
   assert.equal(variant.isClosed(), false, 'a different query stays open'); assert.equal(newer.isClosed(), false);
+  const burst = await worker.evaluate(async url => {
+    const commits = [];
+    chrome.tabs.onUpdated.addListener((id, change) => { if (change.url === url) commits.push(id); });
+    await Promise.all([1, 2].map(() => chrome.tabs.create({ url, active: false })));
+    await new Promise(r => setTimeout(r, 1500));
+    return { commits, kept: (await chrome.tabs.query({})).filter(t => t.url === url).map(t => t.id) };
+  }, origin + '/docs/burst');
+  assert.deepEqual(burst.kept, [burst.commits.at(-1)], 'the last tab to commit survives near-simultaneous opens');
   const newerId = await tabId(newer);
   await activate(newer);
   const background = await worker.evaluate(url => chrome.tabs.create({ url, active: false }), dupUrl);
@@ -195,12 +203,15 @@ try {
   await until(async () => (await inspectTab(editedId))?.dirty, 'edit detected');
   await activate(other); await open('/owner/repo/pull/dup');
   await sleep(800); assert.equal(edited.isClosed(), false, 'an edited watched page stays open');
-  await editor.bringToFront(); await editor.locator('#close-duplicates').uncheck();
+  // The second click lands while the first is saving; the checkbox must show the saved state.
+  await editor.bringToFront(); await editor.locator('#close-duplicates').evaluate(box => { box.click(); box.click(); });
   await until(() => worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings.closeDuplicates === false), 'duplicate setting saved');
+  await sleep(300); assert.equal(await editor.locator('#close-duplicates').isChecked(), false);
   await editor.screenshot({ path: join(shots, 'settings.png'), fullPage: true });
   const keptOld = await open('/docs/off');
   await activate(other); await open('/docs/off');
   await sleep(800); assert.equal(keptOld.isClosed(), false, 'disabled setting keeps duplicates');
+  assert.equal(later.isClosed(), false, 'changing the duplicate setting keeps rule state');
   console.log('Exact duplicate closing, protections, and setting passed');
   console.log(`Screenshots: ${shots}`);
 } finally {

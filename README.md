@@ -69,10 +69,10 @@ never compared. The global pause stops it too.
   focusing another browser window does not close its selected tab.
 - Detected input/change events protect a document until reload; this is
   conservative, not a guarantee that every website's unsaved work is detected.
-- Missing permissions, unavailable content scripts, and unknown state leave tabs
-  open. URLs and eligibility are checked again before closing.
+- For rules, missing permissions, unavailable content scripts, and unknown state leave
+  tabs open. URLs and eligibility are checked again before closing.
 - Completion and queued tabs survive service-worker suspension, but not a browser
-  restart. Navigation, settings changes, or permission removal clear stale state.
+  restart. Navigation, rule or pause changes, or permission removal clear stale state.
   Only tabs already present when a group is armed are queued.
 - Top-level HTTP(S) pages only. No browser-internal pages, iframes, or shadow-DOM
   selection. Pickers may use positional selectors when stable attributes are absent.

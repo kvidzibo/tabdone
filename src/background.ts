@@ -102,15 +102,18 @@ async function edited(tabId: number, url: string) {
   try { return (await chrome.tabs.sendMessage(tabId, { type: 'inspect', expectedUrl: url }, { frameId: 0 }))?.dirty === true; }
   catch { return false; }
 }
+// URL commit order, recorded as events arrive: queued handlers can run after later commits.
+const commits = new Map<number, number>();
+let commitCount = 0;
 // A tab that just committed a URL replaces older tabs showing exactly that URL.
-async function closeDuplicates(id: number, url: string) {
+async function closeDuplicates(id: number, url: string, order: number) {
   const config = await settings();
   const tab = await getTab(id);
   if (!config.enabled || !config.closeDuplicates || !tab || tab.url !== url || tab.pendingUrl) return;
   try { pageUrl(url); } catch { return; }
   const state = await session();
   const duplicate = (t?: chrome.tabs.Tab) => Boolean(t?.id && t.id !== id && t.url === url && t.incognito === tab.incognito &&
-    !t.active && !t.pinned && !t.pendingUrl && !state.picking[t.id]);
+    (commits.get(t.id) ?? 0) < order && !t.active && !t.pinned && !t.pendingUrl && !state.picking[t.id]);
   for (const candidate of await chrome.tabs.query({})) {
     if (!duplicate(candidate) || await edited(candidate.id!, url)) continue;
     const source = await getTab(id);
@@ -206,6 +209,12 @@ async function message(msg: any, sender: chrome.runtime.MessageSender) {
     await save(emptySession()); await syncScripts(); await reconcile();
     return { ok: true };
   }
+  if (msg.type === 'setCloseDuplicates') {
+    // Change only this preference; rule state and site-access checks stay untouched.
+    const stored = (await chrome.storage.local.get('settings')).settings ?? defaults;
+    await chrome.storage.local.set({ settings: { ...stored, closeDuplicates: msg.value === true } });
+    return { ok: true };
+  }
   if (msg.type === 'pick' || msg.type === 'test') {
     const tab = await getTab(msg.tabId);
     if (!tab?.id || !tab.url) throw new Error('Open a normal website tab first.');
@@ -243,13 +252,15 @@ chrome.runtime.onStartup.addListener(() => { void serial(async () => { await sav
 chrome.tabs.onActivated.addListener(() => { void serial(reconcile); });
 chrome.tabs.onCreated.addListener(() => { void serial(async () => badges(await session(), await settings())); });
 chrome.tabs.onUpdated.addListener((id, change) => {
+  let order = 0;
+  if (change.url) commits.set(id, order = ++commitCount);
   void serial(async () => {
     if (change.url || change.status === 'loading') {
       const state = await session(); delete state.observations[id]; delete state.pending[id]; delete state.picking[id];
       for (const [key, p] of Object.entries(state.pending)) if (p.sourceId === id) delete state.pending[key];
       await save(state);
     }
-    if (change.url) await closeDuplicates(id, change.url);
+    if (change.url) await closeDuplicates(id, change.url, order);
     if (change.status === 'complete') {
       // document_idle can run before slow subresources finish. Reannounce after
       // the loading guard lifts, even if the DOM's completion state is unchanged.
@@ -268,6 +279,7 @@ chrome.tabs.onUpdated.addListener((id, change) => {
   });
 });
 chrome.tabs.onRemoved.addListener(id => {
+  commits.delete(id);
   void serial(async () => { const state = await session(); delete state.observations[id]; delete state.pending[id]; delete state.picking[id]; await save(state); await reconcile(); });
 });
 chrome.permissions.onRemoved.addListener(() => {
