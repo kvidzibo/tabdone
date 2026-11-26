@@ -8,8 +8,8 @@ export interface Rule {
   closeRelated: boolean;
   enabled: boolean;
 }
-export interface Settings { enabled: boolean; rules: Rule[] }
-export const defaults: Settings = { enabled: true, rules: [] };
+export interface Settings { enabled: boolean; closeDuplicates: boolean; rules: Rule[] }
+export const defaults: Settings = { enabled: true, closeDuplicates: true, rules: [] };
 export function normalizedText(text: string): string { return text.replace(/\s+/g, " ").trim(); }
 
 export function pageUrl(raw: string): URL {

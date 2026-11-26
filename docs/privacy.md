@@ -1,6 +1,6 @@
 # TabDone privacy policy
 
-Last updated: November 14, 2026
+Last updated: November 26, 2026
 
 TabDone is an open-source browser extension that closes completed tabs using
 rules you define. It processes data on your device. The extension does not send
@@ -10,8 +10,8 @@ advertising, remote code, or backend service.
 ## Data used and why
 
 - **Open tabs:** Tab URLs and tab state, such as selection, loading and pinning,
-  are used to match rules, group related tabs, show status and decide which tabs
-  may close. Temporary URLs can include query strings and fragments even though
+  are used to match rules, group related tabs, find exact duplicate tabs, show
+  status and decide which tabs may close. Temporary URLs can include query strings and fragments even though
   rule matching and grouping ignore them. TabDone does not use Chrome's browsing
   history API.
 - **Website content:** On sites you permit, TabDone inspects page elements,

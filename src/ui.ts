@@ -75,7 +75,7 @@ function renderScopes(depth: number) {
 function preview() {
   const depth = Number(input('scope').value);
   input('scope').disabled = !input('related').checked;
-  $('scope-preview').textContent = input('related').checked ? (sourceUrl ? `${groupUrl(sourceUrl, depth)} + /subpages; query and fragment ignored.` : `Group each matching page by its first ${depth} path segments.`) : 'Only the completed tab will close. Duplicate tabs stay open.';
+  $('scope-preview').textContent = input('related').checked ? (sourceUrl ? `${groupUrl(sourceUrl, depth)} + /subpages; query and fragment ignored.` : `Group each matching page by its first ${depth} path segments.`) : 'Only the completed tab will close. Other matching tabs stay open.';
 }
 function fill(rule?: Rule) {
   editingId = rule?.id || '';
@@ -100,7 +100,7 @@ async function storeDraft() {
 async function receivePick() {
   const status = await send({ type: 'status', tabId: sourceId });
   const picked = status.state.picked;
-  if (picked?.tabId === sourceId && JSON.stringify(picked) !== lastPick) {
+  if (picked && picked.tabId === sourceId && JSON.stringify(picked) !== lastPick) {
     lastPick = JSON.stringify(picked);
     input('selector').value = picked.selector; input('text').value = picked.text;
     $('test-result').textContent = 'Element selected. Test this rule, then save.';
@@ -109,7 +109,7 @@ async function receivePick() {
 }
 async function initEditor() {
   const status = await send({ type: 'status', tabId: sourceId }); config = status.config;
-  input('global-enabled').checked = config.enabled;
+  input('global-enabled').checked = config.enabled; input('close-duplicates').checked = config.closeDuplicates;
   if (sourceId && status.tab?.id === sourceId) {
     try { sourceUrl = pageUrl(status.tab.url).href; } catch { sourceId = undefined; }
   } else sourceId = undefined;
@@ -164,13 +164,31 @@ async function initEditor() {
     if (area === 'session' && changes.state) void receivePick().catch(error);
   });
 }
-input('global-enabled').onchange = () => { void run(async () => {
+function toggle(id: string, save: (checked: boolean) => Promise<void>) {
+  const box = input(id);
+  box.onchange = () => {
+    // run() ignores clicks during another save; never show an unsaved state.
+    if (busy) { box.checked = !box.checked; return; }
+    void run(async () => {
+      try { await save(box.checked); } catch (err) { box.checked = !box.checked; throw err; }
+      if (popup) await renderPopup();
+    });
+  };
+}
+toggle('global-enabled', async enabled => {
   const fresh = await send({ type: 'status' });
-  const enabled = input('global-enabled').checked;
-  try { await send({ type: 'saveSettings', config: { ...fresh.config, enabled } }); config = { ...fresh.config, enabled }; }
-  catch (err) { input('global-enabled').checked = fresh.config.enabled; throw err; }
-  if (popup) await renderPopup();
-}); };
+  await send({ type: 'saveSettings', config: { ...fresh.config, enabled } }); config = { ...fresh.config, enabled };
+});
+if (!popup) toggle('close-duplicates', async value => {
+  await send({ type: 'setCloseDuplicates', value });
+});
+// Keep switches in sync with saves from other TabDone pages, including during startup.
+if (!popup) chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.settings) return;
+  const saved = changes.settings.newValue as Partial<Settings> | undefined;
+  input('global-enabled').checked = saved?.enabled === true;
+  input('close-duplicates').checked = saved?.closeDuplicates !== false;
+});
 if (popup) {
   $('new-rule').onclick = () => { void openEditor(sourceId); };
   $('manage').onclick = () => { void openEditor(); };

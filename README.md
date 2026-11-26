@@ -2,7 +2,8 @@
 
 A Chrome/Chromium extension that closes finished tabs using rules you define.
 Pick a completion element, match its visible text, and close the page and related
-tabs when you switch tabs. No GitHub-specific logic, accounts, or backend.
+tabs when you switch tabs. It can also close older duplicate tabs.
+No GitHub-specific logic, accounts, or backend.
 
 ## Install
 
@@ -53,16 +54,25 @@ The badge shows the current group count: gray while watching, purple when done,
 and **Ⅱ** when paused. Counts include protected tabs. The popup has a global pause;
 **Manage rules** lets you edit, disable, or delete rules.
 
+## Duplicate tabs
+
+**Close older duplicate tabs** is on by default; turn it off in **Manage rules** → **Settings**.
+When a tab loads or navigates to an HTTP(S) URL already open in another tab,
+TabDone closes the older tab. URLs must match exactly, including query and fragment.
+It needs no rule or site access. Pinned and selected tabs stay open, as do edited pages
+on watched sites; edits elsewhere cannot be detected. Incognito and normal tabs are
+never compared. The global pause stops it too.
+
 ## Safety and limitations
 
 - Pinned tabs and selected tabs in **every** window stay open. Switching apps or
   focusing another browser window does not close its selected tab.
 - Detected input/change events protect a document until reload; this is
   conservative, not a guarantee that every website's unsaved work is detected.
-- Missing permissions, unavailable content scripts, and unknown state leave tabs
-  open. URLs and eligibility are checked again before closing.
+- For rules, missing permissions, unavailable content scripts, and unknown state leave
+  tabs open. URLs and eligibility are checked again before closing.
 - Completion and queued tabs survive service-worker suspension, but not a browser
-  restart. Navigation, settings changes, or permission removal clear stale state.
+  restart. Navigation, rule or pause changes, or permission removal clear stale state.
   Only tabs already present when a group is armed are queued.
 - Top-level HTTP(S) pages only. No browser-internal pages, iframes, or shadow-DOM
   selection. Pickers may use positional selectors when stable attributes are absent.
@@ -103,6 +113,7 @@ The Linux browser test requires `chromium`, `xvfb-run`, `dbus-run-session`,
 It uses a temporary profile, private display/D-Bus, and a local fixture server;
 it never touches your browser profile. Screenshots go to `/tmp/tabdone-screenshots`
 (or `TABDONE_SCREENSHOTS`). Tests cover picker/save, dynamic matching, grouped
-closing, active/pinned/edited tabs, navigation, pause, and worker restarts.
+closing, active/pinned/edited tabs, navigation, pause, worker restarts, and
+duplicate closing.
 
 MIT licensed.
