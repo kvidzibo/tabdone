@@ -180,11 +180,13 @@ async function sweep() {
   await badges(state, config);
 }
 // Some Linux window managers briefly report no focus between two browser windows,
-// so focus loss must last 500 ms, whichever trigger noticed it.
+// so focus loss must last 500 ms without any reported focus gain, whichever trigger noticed it.
+let focusGains = 0;
 async function sweepIfUnfocused() {
+  const gains = focusGains;
   if (!await unfocused()) return;
   await new Promise(resolve => setTimeout(resolve, 500));
-  if (await unfocused()) await sweep();
+  if (gains === focusGains && await unfocused()) await sweep();
 }
 function trustedUI(sender: chrome.runtime.MessageSender) {
   return sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));
@@ -286,7 +288,10 @@ chrome.runtime.onStartup.addListener(() => { void serial(async () => { await sav
 const sweepAlarm = 'sweep';
 void chrome.alarms.get(sweepAlarm).then(alarm => { if (!alarm) void chrome.alarms.create(sweepAlarm, { periodInMinutes: 0.5 }); });
 chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === sweepAlarm) void serial(sweepIfUnfocused); });
-chrome.windows.onFocusChanged.addListener(id => { if (id === chrome.windows.WINDOW_ID_NONE) void serial(sweepIfUnfocused); });
+chrome.windows.onFocusChanged.addListener(id => {
+  if (id === chrome.windows.WINDOW_ID_NONE) void serial(sweepIfUnfocused);
+  else focusGains++;
+});
 chrome.tabs.onCreated.addListener(() => { void serial(async () => badges(await session(), await settings())); });
 chrome.tabs.onUpdated.addListener((id, change) => {
   void serial(async () => {

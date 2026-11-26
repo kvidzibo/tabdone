@@ -39,8 +39,8 @@ Features:
 
 Tabs close only when no Chrome window TabDone can see has focus, for example after
 you switch to another application; focusing another Chrome profile or an incognito
-window without TabDone access also counts. Tabs never close while you browse. On some
-Linux systems this can take up to 30 seconds. Selected tabs stay open.
+window without TabDone access also counts. On some Linux systems this can take up
+to 30 seconds. Selected tabs stay open.
 Edit detection is conservative, not a guarantee that every site's unsaved work
 will be recognized. Test rules carefully: broad selectors or close scopes can
 close unintended tabs, and changing website markup can require rule updates.
