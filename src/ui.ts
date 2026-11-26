@@ -47,7 +47,7 @@ async function renderPopup() {
     return o.ruleIds.includes(r.id) && (r.closeRelated ? groupUrl(o.url, r.baseDepth) === groupUrl(sourceUrl, r.baseDepth) : Number(id) === sourceId);
   }));
   const granted = rules.length > 0 && await chrome.permissions.contains({ origins: [hostPermission(rules[0].pattern)] });
-  $('page-status').textContent = !config.enabled ? 'Paused — nothing will close' : !rules.length ? 'No matching rule' : !granted ? 'Site access needed — edit the rule' : ready ? '● Done — closes when you leave the browser' : 'Watching for completion';
+  $('page-status').textContent = !config.enabled ? 'Paused — nothing will close' : !rules.length ? (matching.length ? 'Duplicates of this page stay open' : 'No matching rule') : !granted ? 'Site access needed — edit the rule' : ready ? '● Done — closes after you switch tabs and leave the browser' : 'Watching for completion';
   const rule = rules[0], base = rule ? groupUrl(sourceUrl, rule.baseDepth) : null;
   const count = base && rule.closeRelated ? status.tabs.filter((t: chrome.tabs.Tab) => t.url && inGroup(t.url, base)).length : rule ? 1 : 0;
   $('count').textContent = count ? `${count} matching tab${count === 1 ? '' : 's'} · pinned tabs stay open` : 'Choose an element that means this page is done.';

@@ -53,7 +53,9 @@ Tabs close only after you leave the browser for another app; switching tabs or
 browser windows closes nothing. TabDone sweeps immediately when Chrome reports
 the focus loss, and otherwise checks every 30 seconds whether any browser window
 has focus. Chromium on Linux/X11 does not report it, so closing there can take up
-to 30 seconds. Sweeps repeat while the browser stays unfocused.
+to 30 seconds. Sweeps repeat while the browser stays unfocused and stop when
+you return. Focusing another Chrome profile, or an incognito window TabDone is
+not allowed to access, also counts as leaving.
 
 The badge shows the current group count: gray while watching, purple when done,
 and **Ⅱ** when paused. Counts include protected tabs. The popup has a global pause;

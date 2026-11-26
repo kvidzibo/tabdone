@@ -38,6 +38,7 @@ try {
   let worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   const id = new URL(worker.url()).host;
   const ext = `chrome-extension://${id}`;
+  await until(async () => (await worker.evaluate(() => chrome.alarms.get('sweep')))?.periodInMinutes === 0.5, 'extension schedules the 30-second focus check');
   const source = await context.newPage(); await source.goto(origin + '/owner/repo/pull/118');
   const sourceId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(t => t.url === url).id, source.url());
   const editor = await context.newPage(); await editor.goto(`${ext}/options.html?tab=${sourceId}`);
@@ -262,8 +263,12 @@ try {
   assert.equal(await editor.locator('#error').innerText(), '');
   assert.equal(await editor.locator('#rule-list').innerText().then(t => t.includes('Keeps duplicates open')), true);
   await editor.screenshot({ path: join(shots, 'editor-keep.png'), fullPage: true });
-  const keepA = await open('/docs/keep/a'); await activate(other); const keepB = await open('/docs/keep/a');
-  await activate(other); await awayFor();
+  await editor.locator('#close-duplicates').check();
+  await until(() => worker.evaluate(async () => (await chrome.storage.local.get('settings')).settings.closeDuplicates), 'duplicate closing re-enabled');
+  const keepA = await open('/docs/keep/a'); const keepB = await open('/docs/keep/a');
+  const controlA = await open('/docs/control'); const controlB = await open('/docs/control');
+  await activate(other); await leave();
+  await until(() => controlA.isClosed() !== controlB.isClosed(), 'unexcluded duplicate closes in the same sweep'); await sleep(500); await back();
   assert.equal(keepA.isClosed(), false, 'excluded duplicates stay open'); assert.equal(keepB.isClosed(), false);
   console.log('Duplicate sweep, protections, keep-duplicates rule, and setting passed');
   console.log(`Screenshots: ${shots}`);

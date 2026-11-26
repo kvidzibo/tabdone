@@ -76,6 +76,11 @@ async function arm(state: Session, config: Settings) {
     }
   }
 }
+// windows.getAll sees only this profile's windows (and incognito ones only with access).
+async function unfocused() {
+  const windows = await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'panel', 'app', 'devtools'] });
+  return !windows.some(w => w.focused);
+}
 async function closePending(state: Session, config: Settings) {
   for (const [key, pending] of Object.entries(state.pending)) {
     const id = Number(key);
@@ -93,6 +98,8 @@ async function closePending(state: Session, config: Settings) {
     const latest = await settings();
     if (!latest.enabled || !latest.rules.some(r => JSON.stringify(r) === JSON.stringify(rule)) || !await allowed(rule)) continue;
     if (!tab || tab.active || tab.pinned || tab.pendingUrl || tab.status === 'loading' || tab.url !== pending.url) continue;
+    // Stop if you return to the browser mid-sweep; the next sweep resumes.
+    if (!await unfocused()) return;
     try { await chrome.tabs.remove(id); delete state.pending[key]; delete state.observations[key]; }
     catch { /* The tab may already have closed. */ }
   }
@@ -125,6 +132,7 @@ async function closeDuplicates(state: Session, config: Settings) {
       const latest = await getTab(tab.id!), kept = await getTab(keeper.id!), now = await settings();
       if (!now.enabled || !now.closeDuplicates || !latest || latest.url !== tab.url || latest.pendingUrl || held(latest) ||
         !kept || kept.url !== tab.url || kept.pendingUrl) continue;
+      if (!await unfocused()) return;
       try { await chrome.tabs.remove(tab.id!); } catch { /* Already closed. */ }
     }
   }
@@ -170,10 +178,7 @@ async function sweep() {
   await save(state);
   await badges(state, config);
 }
-async function sweepIfUnfocused() {
-  const windows = await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'panel', 'app', 'devtools'] });
-  if (!windows.some(w => w.focused)) await sweep();
-}
+async function sweepIfUnfocused() { if (await unfocused()) await sweep(); }
 function trustedUI(sender: chrome.runtime.MessageSender) {
   return sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL(''));
 }

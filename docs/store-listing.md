@@ -126,7 +126,7 @@ No account, subscription, backend or credentials are required.
    and in the background. Switch to another application for up to 30 seconds;
    the repository tab should close and the editor stays open.
 7. Open the same repository URL again and keep it selected. The popup should show
-   **Done — closes when you leave the browser** once the README loads. Switch to a
+   **Done — closes after you switch tabs and leave the browser** once the README loads. Switch to a
    different tab, then to another application; the repository tab should close.
 8. Open `https://github.com/kvidzibo/tabdone/issues` twice in two tabs, select a third
    tab, then switch to another application. One issues tab should close.
